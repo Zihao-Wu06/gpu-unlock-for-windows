@@ -72,6 +72,75 @@ static EFI_STATUS VerifySelectors(const char *phase) {
     ss0!=0xbadf5620 && ss1!=0xbadf5620 && readout!=0xffffffff &&
     (readout&0xffff0000U)!=0xbadf0000U?EFI_SUCCESS:EFI_DEVICE_ERROR;
 }
+/* Local patch iteration 2 (RTX 4070 Ti handoff, 2026-10-28): RUN07 proved
+   plain reconnect retries never produce a display on this board (20 attempts,
+   ~10 s, GOP physical=0 throughout), and the stock log cannot distinguish
+   "no GOP handle exists" from "a GOP handle exists but has no framebuffer
+   set" (DisplayCheck skips framebuffer-less handles silently). The helpers
+   below therefore (a) dump every GOP handle and the card's PCI ownership
+   after the reconnect, and (b) inside the retry loop try the two standard
+   firmware actions that complete a half-created GOP: SetMode(0) on a
+   target GOP with no framebuffer, and connecting the GOP handles and the
+   console-out handle the way the boot manager would. Diagnostics only log;
+   the actions are ordinary boot-services calls. Pass criteria unchanged. */
+static VOID DumpGopHandles(const char *tag) {
+  EFI_HANDLE *handles=NULL;UINTN count=0;
+  EFI_STATUS status=Gu.bs->LocateHandleBuffer(ByProtocol,&GopGuid,NULL,&count,&handles);
+  GuLog("GOPDIAG %s: locate_status=%#llx handles=%zu\n",tag,(unsigned long long)status,(size_t)(EFI_ERROR(status)?0:count));
+  if(EFI_ERROR(status)||!handles||count>128){if(handles)GuFree(handles);return;}
+  for(UINTN i=0;i<count;i++) {
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *g=NULL;EFI_DEVICE_PATH_PROTOCOL *path=NULL;EFI_HANDLE parent=NULL;UINTN target=0;
+    EFI_STATUS hs=Gu.bs->HandleProtocol(handles[i],&GopGuid,(VOID **)&g);
+    if(EFI_ERROR(hs)||!g){GuLog("GOPDIAG %s: [%zu] handle=%#llx gop_status=%#llx\n",tag,(size_t)i,(unsigned long long)(UINTN)handles[i],(unsigned long long)hs);continue;}
+    if(!EFI_ERROR(Gu.bs->HandleProtocol(handles[i],&PathGuid,(VOID **)&path))&&path) {
+      EFI_DEVICE_PATH_PROTOCOL *rest=path;
+      if(!EFI_ERROR(Gu.bs->LocateDevicePath(&PciGuid,&rest,&parent)))target=(parent==Gu.handle);
+    }
+    if(!g->Mode){GuLog("GOPDIAG %s: [%zu] handle=%#llx target=%zu mode=NULL\n",tag,(size_t)i,(unsigned long long)(UINTN)handles[i],(size_t)target);continue;}
+    GuLog("GOPDIAG %s: [%zu] handle=%#llx target=%zu max_mode=%u mode=%u fb_base=%#llx fb_size=%#llx hres=%u vres=%u\n",
+      tag,(size_t)i,(unsigned long long)(UINTN)handles[i],(size_t)target,(unsigned)g->Mode->MaxMode,(unsigned)g->Mode->Mode,
+      (unsigned long long)g->Mode->FrameBufferBase,(unsigned long long)g->Mode->FrameBufferSize,
+      g->Mode->Info?(unsigned)g->Mode->Info->HorizontalResolution:0U,
+      g->Mode->Info?(unsigned)g->Mode->Info->VerticalResolution:0U);
+  }
+  GuFree(handles);
+}
+static VOID DumpCardOwner(EFI_HANDLE Driver,const char *tag) {
+  EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *entries=NULL;UINTN count=0,bydriver=0;
+  EFI_STATUS status=Gu.bs->OpenProtocolInformation(Gu.handle,&PciGuid,&entries,&count);
+  if(EFI_ERROR(status)||(count&&!entries)){GuLog("GOPDIAG %s: owner_status=%#llx\n",tag,(unsigned long long)status);return;}
+  for(UINTN i=0;i<count;i++)if(entries[i].AgentHandle==Driver&&(entries[i].Attributes&EFI_OPEN_PROTOCOL_BY_DRIVER))bydriver++;
+  GuLog("GOPDIAG %s: pci_entries=%zu driver_bound_by_driver=%zu\n",tag,(size_t)count,(size_t)bydriver);
+  if(entries)Gu.bs->FreePool(entries);
+}
+static VOID TrySetModeOnTarget(VOID) {
+  EFI_HANDLE *handles=NULL;UINTN count=0;
+  if(EFI_ERROR(Gu.bs->LocateHandleBuffer(ByProtocol,&GopGuid,NULL,&count,&handles))||!handles||count>128){if(handles)GuFree(handles);return;}
+  for(UINTN i=0;i<count;i++) {
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *g=NULL;EFI_DEVICE_PATH_PROTOCOL *path=NULL;EFI_HANDLE parent=NULL;
+    if(EFI_ERROR(Gu.bs->HandleProtocol(handles[i],&GopGuid,(VOID **)&g))||!g||!g->Mode)continue;
+    if(g->Mode->FrameBufferBase||g->Mode->FrameBufferSize)continue;
+    if(EFI_ERROR(Gu.bs->HandleProtocol(handles[i],&PathGuid,(VOID **)&path))||!path)continue;
+    EFI_DEVICE_PATH_PROTOCOL *rest=path;
+    if(EFI_ERROR(Gu.bs->LocateDevicePath(&PciGuid,&rest,&parent))||parent!=Gu.handle)continue;
+    EFI_STATUS s=g->SetMode(g,0);
+    GuLog("GOPDIAG setmode0: handle=%#llx status=%#llx fb_base=%#llx fb_size=%#llx\n",(unsigned long long)(UINTN)handles[i],(unsigned long long)s,
+      (unsigned long long)(g->Mode?g->Mode->FrameBufferBase:0),(unsigned long long)(g->Mode?g->Mode->FrameBufferSize:0));
+  }
+  GuFree(handles);
+}
+static VOID TryConnectGopAndConsole(VOID) {
+  EFI_HANDLE *handles=NULL;UINTN count=0;
+  if(!EFI_ERROR(Gu.bs->LocateHandleBuffer(ByProtocol,&GopGuid,NULL,&count,&handles))&&handles&&count<=128) {
+    for(UINTN i=0;i<count;i++)Gu.bs->ConnectController(handles[i],NULL,NULL,TRUE);
+    GuLog("GOPDIAG connect: gop_handles=%zu connected\n",(size_t)count);
+  }
+  if(handles)GuFree(handles);
+  if(Table&&Table->ConsoleOutHandle) {
+    EFI_STATUS s=Gu.bs->ConnectController(Table->ConsoleOutHandle,NULL,NULL,TRUE);
+    GuLog("GOPDIAG connect: console_out status=%#llx\n",(unsigned long long)s);
+  }
+}
 static EFI_STATUS RestoreDisplayForWindows(EFI_HANDLE Driver) {
   if(!WindowsImage || !Driver || !GuScreenDetached || !GuSafeToReturn() || !Gu.quiesced ||
      Gu.flrs!=1 || Gu.allocations || Gu.dma_count || !Gu.owned || Gu.fault)return EFI_NOT_READY;
@@ -86,7 +155,29 @@ static EFI_STATUS RestoreDisplayForWindows(EFI_HANDLE Driver) {
   if(EFI_ERROR(s))return s;
   s=GuRefreshTargetPci();if(EFI_ERROR(s))return s;
   ExpectDetached=FALSE;
-  if(!DisplayCheck())return EFI_DEVICE_ERROR;
+  /* Local patch (RTX 4070 Ti handoff, 2026-10-28; iteration 2): on this
+     board/firmware no usable GOP display exists at the first check after
+     ConnectController (RUN05/RUN06 stock: gave up immediately; RUN07 with
+     plain retries: 20 attempts over ~10 s, still none). The loop below
+     keeps the bounded retry and adds the iteration-2 diagnostics/actions
+     above at fixed attempts (2 = SetMode, 3 = console connect, 4 = dump
+     again) so the log attributes any change. The pass criteria are
+     unchanged: DisplayCheck() must still find exactly one physical GOP on
+     the target, and the PCI command/BAR and POST-GOP selector checks below
+     still run before Windows is started. If no display appears within the
+     bound, this still returns EFI_DEVICE_ERROR exactly as stock. */
+  BOOLEAN display=DisplayCheck();
+  if(!display){DumpGopHandles("after-reconnect");DumpCardOwner(Driver,"after-reconnect");}
+  for(UINTN attempt=1;!display && attempt<=20;attempt++) {
+    GuLog("GOP reconnect retry: attempt=%zu of 20; waiting 500 ms, reconnecting\n",(size_t)attempt);
+    Gu.bs->Stall(500000);
+    Gu.bs->ConnectController(Gu.handle,drivers,NULL,TRUE);
+    if(attempt==2)TrySetModeOnTarget();
+    if(attempt==3)TryConnectGopAndConsole();
+    if(attempt==4){DumpGopHandles("after-actions");DumpCardOwner(Driver,"after-actions");}
+    display=DisplayCheck();
+  }
+  if(!display){DumpGopHandles("final");return EFI_DEVICE_ERROR;}
   UINT16 command=0;UINT32 value=0;
   s=GuConfigRead(EfiPciIoWidthUint16,4,&command);
   if(EFI_ERROR(s)||command!=(UINT16)InitialConfig[1]||(command&4))return EFI_DEVICE_ERROR;
