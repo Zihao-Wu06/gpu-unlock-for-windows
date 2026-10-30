@@ -28,7 +28,7 @@ if (-not $Lang) {
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
 try { $OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
-try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13 } catch { }
 $Root = $PSScriptRoot
 $Payload = Join-Path $Root 'payload'
 $Manifest = Get-Content -LiteralPath (Join-Path $Payload 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
