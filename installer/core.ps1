@@ -28,6 +28,7 @@ if (-not $Lang) {
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
 try { $OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
+# archive.cachyos.org rejects TLS 1.2, so TLS 1.3 is allowed as well (a runtime without a Tls13 member keeps TLS 1.2).
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13 } catch { }
 $Root = $PSScriptRoot
 $Payload = Join-Path $Root 'payload'
@@ -328,6 +329,10 @@ function Invoke-Download {
                 if (Test-Path -LiteralPath $part) { $pct = [int](100 * (Get-Item -LiteralPath $part).Length / $i.size); if ($pct -ge $lastPct + 10) { Log ("  {0}%" -f $pct); $lastPct = $pct } }
             }
             $task.GetAwaiter().GetResult()
+        } catch {
+            $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }; $why = $e.Message
+            if (Test-Path -LiteralPath $part) { Remove-Item -LiteralPath $part -Force -ErrorAction SilentlyContinue }
+            Fail (L "could not download $($i.file) from $($i.url): $($why). If this PC cannot connect (the CachyOS server needs TLS 1.3, which Windows 10 may lack), download the file on another PC and copy it into $($Cache)." "无法下载 $($i.file) ($($i.url)): $($why)。如果这台电脑连不上 (CachyOS 的服务器需要 TLS 1.3, Windows 10 可能不支持), 请在另一台电脑上下载该文件, 复制到 $($Cache)。")
         } finally { $wc.Dispose() }
         $got = (Get-Item -LiteralPath $part).Length
         if ($got -ne $i.size) { Remove-Item -LiteralPath $part -Force; Fail (L "$($i.file): size $got, expected $($i.size)" "$($i.file): 大小为 $got, 应为 $($i.size)") }

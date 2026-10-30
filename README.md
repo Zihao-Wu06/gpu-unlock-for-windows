@@ -71,7 +71,7 @@ The installer's **Check system** button checks each of these and refuses to inst
 | ASUS ROG STRIX Z790-H (BIOS 3107), i7-14700KF, ASUS RTX 4090 | Other boards and other 4090 brands; some firmware ignores or resets boot-order changes made from Windows |
 | Install, uninstall (the volume is restored to its exact size), switch on/off, re-enroll | USB-drive mode, rollback after a failed install |
 | First-start enrollment plus unlock, unlock after cold boot and restart, more than 10 successful unlocks | Behaviour after sleep (S3; the unlock is expected to be lost), with Fast Startup on, after Windows or BIOS updates |
-| Download hash checks against a pre-filled cache | A real online download on a fresh PC |
+| Download, size and SHA-256 checks against a pre-filled cache and a local TLS 1.3 test server | A real online download on a fresh PC (archive.cachyos.org needs TLS 1.3, which Windows 10 may lack; then copy the file into the cache by hand) |
 | UI at 100 %, and simulated 125 % and 150 % scaling | User names or paths with non-ASCII characters |
 
 **Reports from other machines are very welcome.** Please open an issue with your board, BIOS version, GPU brand, Windows version and the boot log (button **Boot log**; the `FINAL` line matters most).

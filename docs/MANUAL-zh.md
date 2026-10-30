@@ -157,7 +157,7 @@ powershell -ExecutionPolicy Bypass -File core.ps1 install -Mode usb -Drive E:
 - 重新登记后再试。
 
 **8.4 不能联网 / 下载很慢**
-在能上网的电脑上下载这三个文件，放进 `C:\ProgramData\GPU-Unlock\cache\`，安装器会逐个核对 SHA-256：
+在能上网的电脑上下载这三个文件，放进 `C:\ProgramData\GPU-Unlock\cache\`，安装器会逐个核对 SHA-256。（archive.cachyos.org 只接受 TLS 1.3：Windows 11 支持，Windows 10 可能连不上，这时用别的电脑或浏览器下载那个文件即可。）
 - `NVIDIA-kernel-module-source-610.43.03.tar.xz`（26,172,192 字节），来自 download.nvidia.com；
 - `nvidia-utils-610.43.03-1-x86_64_v3.pkg.tar.zst`（314,789,539 字节），来自 archive.cachyos.org；
 - `python-3.14.0-embed-amd64.zip`（11,994,671 字节），来自 python.org（只用来本地提取固件）。
@@ -199,7 +199,7 @@ bcdedit /set {fwbootmgr} displayorder {该标识符} /remove
 - 在窗口里实际点"试解锁一次"等实验性流程的按钮（界面只做了渲染检查，流程是用命令行测的）；
 - **任何非 4090 的显卡**（芯片表、显存范围、芯片编号检查都是按上游文档写的，从没在那些卡上运行过）；
 - 安装窗口里的 U 盘选项；
-- 联网下载（测试机当时没有外网，下载走的是预先放好的缓存）；
+- 联网下载（测试机当时没有外网：下载走的是预先放好的缓存，下载代码只在本机的 TLS 1.3 测试服务器上跑过，没有连过真实网站；CachyOS 的服务器需要 TLS 1.3，Windows 10 可能不支持，失败时按 8.4 手动放缓存）；
 - U 盘模式；安装中途失败的自动回滚；
 - 睡眠恢复后的行为；Windows 大版本更新、BIOS 更新之后的行为；
 - 真实应用（训练、ComfyUI、LLM）的收益；长时间满载稳定性；
