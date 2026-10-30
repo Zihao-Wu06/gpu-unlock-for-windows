@@ -89,7 +89,8 @@ static EFI_STATUS RestoreDisplayForWindows(EFI_HANDLE Driver) {
   if(!DisplayCheck())return EFI_DEVICE_ERROR;
   UINT16 command=0;UINT32 value=0;
   s=GuConfigRead(EfiPciIoWidthUint16,4,&command);
-  if(EFI_ERROR(s)||command!=(UINT16)InitialConfig[1]||(command&4))return EFI_DEVICE_ERROR;
+  /* GOP may re-enable I/O decode (bit 0); all other command bits must match */
+  if(EFI_ERROR(s)||(command&0xfffe)!=((UINT16)InitialConfig[1]&0xfffe)||(command&4))return EFI_DEVICE_ERROR;
   for(UINT32 offset=0x10;offset<=0x24;offset+=4) {
     s=GuConfigRead(EfiPciIoWidthUint32,offset,&value);
     if(EFI_ERROR(s)||value!=InitialConfig[offset/4])return EFI_DEVICE_ERROR;
