@@ -3,7 +3,7 @@
 This directory is the complete corresponding source of `installer/payload/gpuunlock.efi`.
 
 - `windows/` is a subset of [brandonjank/gpu-unlock-ada](https://github.com/brandonjank/gpu-unlock-ada) at commit `26cea8ede6735155c7333dc637db46166d6ede82`. It holds `build.py`, `THIRD_PARTY_NOTICES.md` and `uefi/`, with this project's changes already applied.
-- `patches/generic-mode.patch` is the same changes as a diff against that commit (`git diff` of the upstream tree). It touches `windows/build.py`, `uefi/app.c`, `uefi/app_io.c` and `uefi/app_io.h`, and adds `uefi/board_profile_generic.h`. The changes:
+- `patches/generic-mode.patch` is the same changes as a diff against that commit (`git diff` of the upstream tree). It touches `windows/build.py`, `uefi/app.c`, `uefi/app_io.c`, `uefi/app_io.h` and `uefi/handoff.inc`, and adds `uefi/board_profile_generic.h`. The changes:
   - a `generic` build mode that enrolls the card at its first start (`PROFILE.TXT`) instead of compiling one board's identity into the binary;
   - a **chip table** in `app.c` (`Chips[]`): PCI id, BOOT0 chipset id, memory range and tier for each accepted card. The RTX 4090 is `verified`; the AD103/AD104 cards (4080, 4080 SUPER, 4070 Ti SUPER, 4070 Ti, 4070 SUPER, 4070) are not;
   - a **trial flow** for every card that is not `verified` (or whose profile has `trial_required=1`): the first start only reads the card; an unlock needs `\GPU-UNLOCK\ARMED.TXT` (consumed *before* the attempt) or `\GPU-UNLOCK\AUTO.TXT` (written by the Windows installer after a verified trial);
@@ -13,6 +13,7 @@ This directory is the complete corresponding source of `installer/payload/gpuunl
   - removal of the exact SS1 selector pin (only the "disabled" condition is required);
   - a refusal to run from a volume that contains `\EFI\Microsoft`;
   - enrollment removes a stale `AUTO.TXT`/`ARMED.TXT` before it writes a new profile, so trial state never carries over to a new profile, and it refuses an implausible PCI subsystem id (the same rule the profile reader applies);
+  - after the display is handed back, the PCI command check ignores the I/O Space bit (bit 0), because a platform GOP driver may switch it on again; every other bit must still match and bus mastering must stay off (from pull request #6, reported on an RTX 4080);
   - `-ffile-prefix-map` in `build.py`, so the binary does not contain the build path.
 
 ## Build
@@ -29,9 +30,9 @@ The output `EFI/BOOT/BOOTX64.EFI` is the file the installer ships as `gpuunlock.
 
 ## Reproducing the shipped binary byte for byte
 
-The shipped `gpuunlock.efi` has SHA-256 `722d137d9146341e0de3cbc62a72d8cf8a11bce8f4a4ee2affc38c1846e63ac4` (94720 bytes), built with Zig 0.15.2 from this tree. Because the build strips the source path (`-ffile-prefix-map`), the hash does not depend on where the tree sits. It was rebuilt from a fresh copy of this directory at two different paths on 2026-10-27 and matched both times.
+The shipped `gpuunlock.efi` has SHA-256 `2d39b9397b5922cb10235eb21dd458396d79b32e54994e5bf5f291dd4eadb04a` (94720 bytes), built with Zig 0.15.2 from this tree. Because the build strips the source path (`-ffile-prefix-map`), the hash does not depend on where the tree sits. It was rebuilt from a fresh copy of this directory at two different paths on 2026-10-30 and matched both times.
 
-(The earlier 0.2.0 binary, `5fa4ded5…ee69`, embedded the build path and could only be reproduced at one fixed location.)
+(The previous 0.3.0 build, `722d137d…3ac4`, differs only by the handoff change above. The earlier 0.2.0 binary, `5fa4ded5…ee69`, embedded the build path and could only be reproduced at one fixed location.)
 
 If you use your own build, replace `installer/payload/gpuunlock.efi` and update `efi.size` and `efi.sha256` in `installer/payload/manifest.json`. The installer refuses an EFI file that does not match the manifest.
 

@@ -4,7 +4,7 @@
   "efi": {
     "file": "gpuunlock.efi",
     "size": 94720,
-    "sha256": "722d137d9146341e0de3cbc62a72d8cf8a11bce8f4a4ee2affc38c1846e63ac4"
+    "sha256": "2d39b9397b5922cb10235eb21dd458396d79b32e54994e5bf5f291dd4eadb04a"
   },
   "supported": {
     "gpus": [
