@@ -9,7 +9,7 @@ Thank you for trying an experimental card. Whatever happened, it helps. Please d
 
 **Card and PC**
 - Card (brand, model, VRAM): 
-- PCI ID (Device Manager > Details > Hardware Ids, e.g. `PCI\VEN_10DE&DEV_2705`): 
+- PCI ID (Device Manager > Details > Hardware Ids, e.g. `PCI\VEN_10DE&DEV_2705`, or `DEV_2689` for the AD102 4070 Ti SUPER): 
 - Board and BIOS version: 
 - Windows version and NVIDIA driver version: 
 - Other GPUs or an iGPU in the PC? 

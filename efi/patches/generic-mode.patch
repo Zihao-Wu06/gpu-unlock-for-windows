@@ -39,7 +39,7 @@ index bc8bdd0..cf73c21 100644
                  UEFI / "edk2/MdePkg/Include/X64"]
      subprocess.run([args.zig, "cc", *flags, *(f"-I{p}" for p in includes),
 diff --git a/windows/uefi/app.c b/windows/uefi/app.c
-index f742379..dbdfb18 100644
+index f742379..90441f6 100644
 --- a/windows/uefi/app.c
 +++ b/windows/uefi/app.c
 @@ -10,6 +10,8 @@
@@ -62,7 +62,7 @@ index f742379..dbdfb18 100644
    return Gu.fault?EFI_DEVICE_ERROR:EFI_SUCCESS;
  }
  static VOID LogHash(const char *Name,const VOID *Data,UINTN Bytes) {
-@@ -226,10 +230,224 @@ static EFI_STATUS PromCheck(VOID) {
+@@ -226,10 +230,225 @@ static EFI_STATUS PromCheck(VOID) {
    }
    GuFree(prom);return good?EFI_SUCCESS:Gu.fault?EFI_DEVICE_ERROR:EFI_CRC_ERROR;
  }
@@ -127,6 +127,7 @@ index f742379..dbdfb18 100644
 +  {0x2704,0x193,"GeForce RTX 4080",16256,16384,FALSE},
 +  {0x2702,0x193,"GeForce RTX 4080 SUPER",16256,16384,FALSE},
 +  {0x2705,0x193,"GeForce RTX 4070 Ti SUPER",16256,16384,FALSE},
++  {0x2689,0x192,"GeForce RTX 4070 Ti SUPER (AD102)",16256,16384,FALSE},
 +  {0x2782,0x194,"GeForce RTX 4070 Ti",12160,12288,FALSE},
 +  {0x2783,0x194,"GeForce RTX 4070 SUPER",12160,12288,FALSE},
 +  {0x2786,0x194,"GeForce RTX 4070",12160,12288,FALSE}
@@ -288,7 +289,7 @@ index f742379..dbdfb18 100644
    if(PendingOwner.agent)GuLogText("U will release the RTX firmware driver, restore verified access settings if needed, then attempt WPR_CFG -> FBPA -> WPR -> FEAT in ONE SEC2 launch, then SS0/SS1 if required gates pass; log mismatches and recover.\n");
    GuLogText("Press U once. One SEC2 fire containing four ordered PLM writes, then selectors/FLR/Windows on full success. The last frame may remain visible. Power OFF on STOP. Esc/30s cancels.\n");
    if(!GuLogReady())return EFI_DEVICE_ERROR;
-@@ -245,6 +463,11 @@ static EFI_STATUS Arm(VOID) {
+@@ -245,6 +464,11 @@ static EFI_STATUS Arm(VOID) {
  }
  static VOID PausePreflightFailure(VOID) {
    if(GuScreenDetached || Gu.started || !Table->ConIn || !Table->ConIn->ReadKeyStroke)return;
@@ -300,7 +301,7 @@ index f742379..dbdfb18 100644
    if(Table->ConIn->Reset)Table->ConIn->Reset(Table->ConIn,FALSE);
    GuConsole("Preflight stopped before unlock. See the FINAL stage above and REPORT.TXT.\n");
    GuConsole("Press Enter or Esc to return to firmware; automatic return in 60 seconds. U cannot start an attempt here.\n");
-@@ -293,6 +516,39 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
+@@ -293,6 +517,39 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
      (unsigned)secure,(unsigned long long)status);
    status=Step(status);if(EFI_ERROR(status))goto finish;
    Stage="watchdog";status=Step(Gu.bs->SetWatchdogTimer(0,0,0,NULL));if(EFI_ERROR(status))goto finish;

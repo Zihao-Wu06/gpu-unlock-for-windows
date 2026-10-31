@@ -162,6 +162,17 @@ function UiFamily { if ($script:lang -eq 'zh') { return 'Microsoft YaHei UI' }; 
 function F([single]$Size, [string]$Style = 'Regular') { return New-Object System.Drawing.Font((UiFamily), ([single]($Size * $script:fontMul)), ([System.Drawing.FontStyle]$Style)) }
 function Set-Font($Ctl, [single]$Size, [string]$Style = 'Regular') { [void]$script:fonts.Add(@($Ctl, $Size, $Style)); $Ctl.Font = F $Size $Style }
 function Apply-Fonts { foreach ($x in $script:fonts) { $x[0].Font = F $x[1] $x[2] } }
+function Fit-Tile($Lbl, [string]$Text, [single]$Max = 11, [single]$Min = 8) {
+    # long card names (e.g. "RTX 4070 Ti SUPER (AD102)") must stay on one line: shrink the font until the text fits
+    $Lbl.Text = $Text; $sz = $Max
+    $tracked = @($script:fonts | Where-Object { [object]::ReferenceEquals($_[0], $Lbl) }) | Select-Object -First 1
+    while ($true) {
+        $Lbl.Font = F $sz 'Bold'
+        if ($sz -le $Min -or [System.Windows.Forms.TextRenderer]::MeasureText($Text, $Lbl.Font).Width -le $Lbl.Width) { break }
+        $sz -= 0.5
+    }
+    if ($tracked) { $tracked[1] = [single]$sz }
+}
 
 function New-Lbl($Parent, $X, $Y, $W, $H, [single]$Size = 9, [string]$Style = 'Regular', $Color = $null, [switch]$NoTrack) {
     $l = New-Object System.Windows.Forms.Label
@@ -385,7 +396,7 @@ function Render-Status {
         $tileV[1].Text = '—'; $tileV[2].Text = '—'; $tileV[1].ForeColor = $Pal.Muted; $tileV[2].ForeColor = $Pal.Muted
     }
     $tileT[3].Text = $(if ($s -and $s.experimental) { T 'tCardExp' } else { T 'tCard' })
-    $tileV[3].Text = $(if ($s -and $s.gpu -and $s.gpu.name) { ([string]$s.gpu.name) -replace '^GeForce ', '' } else { '—' })
+    Fit-Tile $tileV[3] $(if ($s -and $s.gpu -and $s.gpu.name) { ([string]$s.gpu.name) -replace '^GeForce ', '' } else { '—' })
     Apply-Enabled
 }
 

@@ -4,7 +4,7 @@
   "efi": {
     "file": "gpuunlock.efi",
     "size": 94720,
-    "sha256": "2d39b9397b5922cb10235eb21dd458396d79b32e54994e5bf5f291dd4eadb04a"
+    "sha256": "1bf857dfa34a660a0254d75004fb298b6d282d9fbab89e0cf035485258c9765a"
   },
   "supported": {
     "gpus": [
@@ -32,6 +32,13 @@
       {
         "id": "2705",
         "name": "GeForce RTX 4070 Ti SUPER",
+        "tier": "experimental",
+        "vram_mib_min": 16100,
+        "vram_mib_max": 16500
+      },
+      {
+        "id": "2689",
+        "name": "GeForce RTX 4070 Ti SUPER (AD102)",
         "tier": "experimental",
         "vram_mib_min": 16100,
         "vram_mib_max": 16500

@@ -36,6 +36,8 @@ Matrix-math throughput on the one card tested (**RTX 4090** 24 GB, 450 W limit, 
 
 Made for **GeForce RTX 40-series** cards: RTX 4090, 4080, 4080 SUPER, 4070 Ti SUPER, 4070 Ti, 4070 SUPER and 4070 (standard memory sizes, one card per PC). **Only the RTX 4090 has been tested.**
 
+The RTX 4070 Ti SUPER exists with two different chips: the common AD103 version (PCI ID `10DE:2705`) and a later AD102 version (`10DE:2689`, a cut-down RTX 4090 chip). Both are accepted. The AD102 version was added from the public PCI ID list and press reports after a user report; this project has never run on one.
+
 On every card other than the RTX 4090 the program is more careful (all of it can be undone from the window):
 
 1. **Read only.** After installing, the first start only reads the card and saves its profile. Nothing is written to the card.
@@ -67,7 +69,7 @@ The installer's **Check system** button checks each of these and refuses to inst
 | Verified on the test PC | Not verified |
 |---|---|
 | Windows 11 Pro 24H2 (26100), driver 610.88 | Windows 10, Home and Server editions |
-| The trial flow (read only, wait, one trial, confirm), forced onto the 4090 with a `trial_required=1` profile key | **Every card other than the 4090.** The chip table and the VRAM and chip-id checks for AD103 and AD104 are written from upstream documentation and were never run on such a card |
+| The trial flow (read only, wait, one trial, confirm), forced onto the 4090 with a `trial_required=1` profile key | **Every card other than the 4090.** The chip table and the VRAM and chip-id checks for AD103 and AD104 are written from upstream documentation, and the entry for the AD102 4070 Ti SUPER from the public PCI ID list; none of them was ever run on such a card |
 | ASUS ROG STRIX Z790-H (BIOS 3107), i7-14700KF, ASUS RTX 4090 | Other boards and other 4090 brands; some firmware ignores or resets boot-order changes made from Windows |
 | Install, uninstall (the volume is restored to its exact size), switch on/off, re-enroll | USB-drive mode, rollback after a failed install |
 | First-start enrollment plus unlock, unlock after cold boot and restart, more than 10 successful unlocks | Behaviour after sleep (S3; the unlock is expected to be lost), with Fast Startup on, after Windows or BIOS updates |
