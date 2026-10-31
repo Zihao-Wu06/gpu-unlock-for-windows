@@ -4,7 +4,7 @@
 
 A one-click Windows installer that turns on the full-rate **FP32-accumulate tensor-core path** of GeForce RTX 40-series cards at every start, before Windows loads the NVIDIA driver. It comes with a small GUI and an on/off switch.
 
-> **Experimental. Only the RTX 4090 has been tested.** The other RTX 40-series cards are supported but untested (see [Supported cards](#supported-cards)). At every start it changes the firmware boot order and writes GPU registers. Read [Risks](#risks) first. Use at your own risk.
+> **Experimental. Only the RTX 4090 has been tested by this project; the RTX 4080 (16 GB) is verified by a user report.** The other RTX 40-series cards are supported but untested (see [Supported cards](#supported-cards)). At every start it changes the firmware boot order and writes GPU registers. Read [Risks](#risks) first. Use at your own risk.
 
 ![Main window](docs/images/main-en.png)
 
@@ -34,9 +34,11 @@ Matrix-math throughput on the one card tested (**RTX 4090** 24 GB, 450 W limit, 
 
 ## Supported cards
 
-Made for **GeForce RTX 40-series** cards: RTX 4090, 4080, 4080 SUPER, 4070 Ti SUPER, 4070 Ti, 4070 SUPER and 4070 (standard memory sizes, one card per PC). **Only the RTX 4090 has been tested.**
+Made for **GeForce RTX 40-series** cards: RTX 4090, 4080, 4080 SUPER, 4070 Ti SUPER, 4070 Ti, 4070 SUPER and 4070 (standard memory sizes, one card per PC). **The RTX 4090 was tested by this project, and the RTX 4080 (16 GB) is verified by a user report ([#8](../../issues/8)); the other cards are untested.**
 
 The RTX 4070 Ti SUPER exists with two different chips: the common AD103 version (PCI ID `10DE:2705`) and a later AD102 version (`10DE:2689`, a cut-down RTX 4090 chip). Both are accepted. The AD102 version was added from the public PCI ID list and press reports after a user report; this project has never run on one.
+
+The RTX 4080 (16 GB, `10DE:2704`) is **verified by a user report** ([#8](../../issues/8)), not by this project's own tests: on one PC (Ryzen 7 7800X3D, Windows 11, driver 617.42) the trial unlocked, automatic unlock then worked at every start over several cold boots, and the user measured FP16 matrix math with FP32 accumulate going from 92.7 to 178.1 TFLOPS. It still follows the careful path below, because one report from one PC is not a test of every board.
 
 On every card other than the RTX 4090 the program is more careful (all of it can be undone from the window):
 
@@ -69,7 +71,7 @@ The installer's **Check system** button checks each of these and refuses to inst
 | Verified on the test PC | Not verified |
 |---|---|
 | Windows 11 Pro 24H2 (26100), driver 610.88 | Windows 10, Home and Server editions |
-| The trial flow (read only, wait, one trial, confirm), forced onto the 4090 with a `trial_required=1` profile key | **Every card other than the 4090.** The chip table and the VRAM and chip-id checks for AD103 and AD104 are written from upstream documentation, and the entry for the AD102 4070 Ti SUPER from the public PCI ID list; none of them was ever run on such a card |
+| The trial flow (read only, wait, one trial, confirm), forced onto the 4090 with a `trial_required=1` profile key | **Every card other than the 4090.** The RTX 4080 16 GB is confirmed by a user report (see Supported cards), not by this project. The chip table and the VRAM and chip-id checks for AD103 and AD104 are written from upstream documentation, and the entry for the AD102 4070 Ti SUPER from the public PCI ID list; apart from that one 4080 report, none of them was ever run on such a card |
 | ASUS ROG STRIX Z790-H (BIOS 3107), i7-14700KF, ASUS RTX 4090 | Other boards and other 4090 brands; some firmware ignores or resets boot-order changes made from Windows |
 | Install, uninstall (the volume is restored to its exact size), switch on/off, re-enroll | USB-drive mode, rollback after a failed install |
 | First-start enrollment plus unlock, unlock after cold boot and restart, more than 10 successful unlocks | Behaviour after sleep (S3; the unlock is expected to be lost), with Fast Startup on, after Windows or BIOS updates |
@@ -116,7 +118,7 @@ The full Chinese manual is in [docs/MANUAL-zh.md](docs/MANUAL-zh.md). It covers 
 ## Risks
 
 - **Black screen.** The boot program writes GPU registers at every start, with nobody watching. If the transaction fails midway, the program halts and asks you to power off, so the PC can hang on a black screen. Hold the power button, then use the boot menu to start *Windows Boot Manager* and turn the switch off. On an experimental card this can happen during the one trial; the trial permission is already used up, so nothing repeats.
-- **Other cards are untested.** For every card except the RTX 4090 the settings come from upstream documentation, not from this project's tests. A wrong value is meant to make the program stop before writing (the card must match its chip id, memory size and cold-state registers), but this has not been exercised on those cards.
+- **Other cards are mostly untested.** For every card except the RTX 4090 the settings come from upstream documentation, not from this project's tests (the RTX 4080 16 GB has one successful user report, [#8](../../issues/8)). A wrong value is meant to make the program stop before writing (the card must match its chip id, memory size and cold-state registers), but this has not been exercised on those cards.
 - **Fast Startup.** With Fast Startup on, *Shut down* resumes a saved Windows session instead of starting fresh. That was not tested, and it can clash with files the boot program changes. **Check system** warns about it; turn it off or always use *Restart*.
 - **Disk changes.** Partition mode shrinks one of your volumes. Back up first.
 - **Unsigned code.** The scripts and the EFI program are unsigned, so antivirus or SmartScreen may warn. You can build the EFI yourself and compare hashes; see [efi/README.md](efi/README.md).
