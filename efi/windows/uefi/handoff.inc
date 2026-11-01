@@ -72,6 +72,53 @@ static EFI_STATUS VerifySelectors(const char *phase) {
     ss0!=0xbadf5620 && ss1!=0xbadf5620 && readout!=0xffffffff &&
     (readout&0xffff0000U)!=0xbadf0000U?EFI_SUCCESS:EFI_DEVICE_ERROR;
 }
+/* After the driver reconnect some platform GOP drivers re-create the card's GOP with an invalid current mode (Mode == MaxMode)
+   and no framebuffer, and nothing sets a mode afterwards (RTX 4070 Ti, issue #1; RTX 4080 on an ASUS Z790 board, issue #9).
+   DisplayCheck() skips such a handle, so the handoff could never pass. The size of the card's display is remembered before the
+   driver release; if the reconnected GOP of the card has no framebuffer, a mode of that size (mode 0 if none matches) is set once.
+   The pass criteria are unchanged: DisplayCheck() still has to find exactly one GOP with a valid framebuffer on the card. */
+static UINT32 PriorGopWidth,PriorGopHeight;
+static BOOLEAN TargetGop(EFI_HANDLE Handle,EFI_GRAPHICS_OUTPUT_PROTOCOL **Gop) {
+  EFI_GRAPHICS_OUTPUT_PROTOCOL *g=NULL;EFI_DEVICE_PATH_PROTOCOL *path=NULL;EFI_HANDLE parent=NULL;
+  if(EFI_ERROR(Gu.bs->HandleProtocol(Handle,&GopGuid,(VOID **)&g))||!g||!g->Mode)return FALSE;
+  if(EFI_ERROR(Gu.bs->HandleProtocol(Handle,&PathGuid,(VOID **)&path))||!path)return FALSE;
+  if(EFI_ERROR(Gu.bs->LocateDevicePath(&PciGuid,&path,&parent))||parent!=Gu.handle)return FALSE;
+  *Gop=g;return TRUE;
+}
+/* Silent on purpose: it runs before the driver release, where no file IO may be added. */
+static VOID RememberTargetGop(VOID) {
+  EFI_HANDLE *handles=NULL;UINTN count=0;
+  if(EFI_ERROR(Gu.bs->LocateHandleBuffer(ByProtocol,&GopGuid,NULL,&count,&handles))||!handles||count>128){if(handles)GuFree(handles);return;}
+  for(UINTN i=0;i<count;i++) {
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *g=NULL;
+    if(!TargetGop(handles[i],&g)||!g->Mode->Info||g->Mode->SizeOfInfo<sizeof(*g->Mode->Info))continue;
+    if(!g->Mode->FrameBufferBase||!g->Mode->FrameBufferSize)continue;
+    PriorGopWidth=g->Mode->Info->HorizontalResolution;PriorGopHeight=g->Mode->Info->VerticalResolution;break;
+  }
+  GuFree(handles);
+}
+static VOID SetModeOnReconnectedGop(VOID) {
+  EFI_HANDLE *handles=NULL;UINTN count=0;
+  if(EFI_ERROR(Gu.bs->LocateHandleBuffer(ByProtocol,&GopGuid,NULL,&count,&handles))||!handles||count>128){if(handles)GuFree(handles);return;}
+  for(UINTN i=0;i<count;i++) {
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *g=NULL;UINT32 mode=0;
+    if(!TargetGop(handles[i],&g)||g->Mode->FrameBufferBase||g->Mode->FrameBufferSize)continue;
+    GuLog("GOP reconnect: the card's GOP has no framebuffer (mode %u of %u); prior display %ux%u\n",
+      (unsigned)g->Mode->Mode,(unsigned)g->Mode->MaxMode,(unsigned)PriorGopWidth,(unsigned)PriorGopHeight);
+    if(PriorGopWidth&&PriorGopHeight)for(UINT32 m=0;m<g->Mode->MaxMode&&m<256;m++) {
+      EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info=NULL;UINTN size=0;BOOLEAN match=FALSE;
+      if(EFI_ERROR(g->QueryMode(g,m,&size,&info))||!info)continue;
+      match=size>=sizeof(*info)&&info->HorizontalResolution==PriorGopWidth&&info->VerticalResolution==PriorGopHeight&&
+        info->PixelFormat<=PixelBlueGreenRedReserved8BitPerColor;
+      Gu.bs->FreePool(info);
+      if(match){mode=m;break;}
+    }
+    EFI_STATUS s=g->SetMode(g,mode);
+    GuLog("GOP reconnect: SetMode(%u) status=%#llx fb_base=%#llx fb_size=%#llx\n",(unsigned)mode,(unsigned long long)s,
+      (unsigned long long)(g->Mode?g->Mode->FrameBufferBase:0),(unsigned long long)(g->Mode?g->Mode->FrameBufferSize:0));
+  }
+  GuFree(handles);
+}
 static EFI_STATUS RestoreDisplayForWindows(EFI_HANDLE Driver) {
   if(!WindowsImage || !Driver || !GuScreenDetached || !GuSafeToReturn() || !Gu.quiesced ||
      Gu.flrs!=1 || Gu.allocations || Gu.dma_count || !Gu.owned || Gu.fault)return EFI_NOT_READY;
@@ -86,7 +133,9 @@ static EFI_STATUS RestoreDisplayForWindows(EFI_HANDLE Driver) {
   if(EFI_ERROR(s))return s;
   s=GuRefreshTargetPci();if(EFI_ERROR(s))return s;
   ExpectDetached=FALSE;
-  if(!DisplayCheck())return EFI_DEVICE_ERROR;
+  BOOLEAN display=DisplayCheck();
+  if(!display){SetModeOnReconnectedGop();display=DisplayCheck();}
+  if(!display)return EFI_DEVICE_ERROR;
   UINT16 command=0;UINT32 value=0;
   s=GuConfigRead(EfiPciIoWidthUint16,4,&command);
   /* GOP may re-enable I/O decode (bit 0); all other command bits must match */

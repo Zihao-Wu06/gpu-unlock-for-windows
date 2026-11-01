@@ -568,6 +568,7 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
   Stage="arming";status=Step(Arm());if(EFI_ERROR(status))goto finish;
   Stage="armed-config";status=Step(ConfigCheck(FALSE));if(EFI_ERROR(status))goto finish;
   Stage="armed-display";Gu.display_ok=DisplayCheck();status=Step(Gu.display_ok?EFI_SUCCESS:EFI_UNSUPPORTED);if(EFI_ERROR(status))goto finish;
+  RememberTargetGop();
   Stage="armed-cold-state";status=Step(ColdCheck());if(EFI_ERROR(status))goto finish;
   if(PendingOwner.agent) {
     GU_RELEASE_OWNER current;

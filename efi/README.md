@@ -14,6 +14,7 @@ This directory is the complete corresponding source of `installer/payload/gpuunl
   - a refusal to run from a volume that contains `\EFI\Microsoft`;
   - enrollment removes a stale `AUTO.TXT`/`ARMED.TXT` before it writes a new profile, so trial state never carries over to a new profile, and it refuses an implausible PCI subsystem id (the same rule the profile reader applies);
   - after the display is handed back, the PCI command check ignores the I/O Space bit (bit 0), because a platform GOP driver may switch it on again; every other bit must still match and bus mastering must stay off (from pull request #6, reported on an RTX 4080);
+  - after the driver is reconnected, if the card's GOP has no framebuffer (the display is back but no mode was set; seen on an RTX 4070 Ti in issue #1 and on an RTX 4080 in issue #9), one `SetMode` is tried, with a mode of the display size from before the release (mode 0 if none matches), and the display check runs again. The check itself is unchanged, so a handoff that still shows no display halts as before. This takes the idea of pull request #3 without its retry loop, extra connects and debug dumps;
   - `-ffile-prefix-map` in `build.py`, so the binary does not contain the build path.
 
 ## Build
@@ -30,9 +31,9 @@ The output `EFI/BOOT/BOOTX64.EFI` is the file the installer ships as `gpuunlock.
 
 ## Reproducing the shipped binary byte for byte
 
-The shipped `gpuunlock.efi` has SHA-256 `1bf857dfa34a660a0254d75004fb298b6d282d9fbab89e0cf035485258c9765a` (94720 bytes), built with Zig 0.15.2 from this tree. Because the build strips the source path (`-ffile-prefix-map`), the hash does not depend on where the tree sits. It was rebuilt from a fresh copy of this directory at two different paths on 2026-10-31 and matched both times.
+The shipped `gpuunlock.efi` has SHA-256 `4e726c2c09e03b9718d61b768d2f039e97faff29e0a2d9cbd44e5b3bbda876f5` (95744 bytes), built with Zig 0.15.2 from this tree. Because the build strips the source path (`-ffile-prefix-map`), the hash does not depend on where the tree sits. It was rebuilt from a fresh copy of this directory at two different paths on 2026-11-01 and matched both times.
 
-(The previous 0.3.0 builds, `2d39b939…b04a` and before it `722d137d…3ac4`, differ only by the AD102 4070 Ti SUPER table entry and by the handoff change above. The earlier 0.2.0 binary, `5fa4ded5…ee69`, embedded the build path and could only be reproduced at one fixed location.)
+(The previous 0.3.0 builds, `1bf857df…765a`, `2d39b939…b04a` and before it `722d137d…3ac4`, differ only by the display `SetMode` step, the AD102 4070 Ti SUPER table entry and the I/O Space handoff change above. The earlier 0.2.0 binary, `5fa4ded5…ee69`, embedded the build path and could only be reproduced at one fixed location.)
 
 If you use your own build, replace `installer/payload/gpuunlock.efi` and update `efi.size` and `efi.sha256` in `installer/payload/manifest.json`. The installer refuses an EFI file that does not match the manifest.
 

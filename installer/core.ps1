@@ -434,8 +434,11 @@ function Invoke-Install {
             $state.ShrunkOriginalSize = $p.Size
             $p2 = Get-Partition -DriveLetter $pick.Letter
             $gap = $p2.Offset + $p2.Size
+            # New-Partition rejects an offset that is not 1 MiB aligned, which happens when the shrunk volume ends on an odd sector boundary (the 4 MiB the shrink leaves over absorbs the rounding)
+            $gap = [int64]([math]::Ceiling($gap / 1MB) * 1MB)
             if ($next -and ($next.Offset - $gap) -lt $PartBytes) { Fail (L 'the freed space is too small' '腾出的空间太小') }
-            $np = New-Partition -DiskNumber $p.DiskNumber -Offset $gap -Size $PartBytes
+            $np = New-Partition -DiskNumber $p.DiskNumber -Offset $gap -Size $PartBytes -ErrorAction Stop
+            if (-not $np) { Fail (L 'could not create the partition' '无法创建分区') }
             $state.PartitionGuid = $np.Guid
             $state.DiskNumber = $np.DiskNumber
             $state.PartitionNumber = $np.PartitionNumber
