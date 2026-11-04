@@ -30,7 +30,7 @@ static EFI_STATUS MakeWindowsPath(VOID) {
   WindowsDevicePath=(VOID*)b;return EFI_SUCCESS;
 }
 static EFI_STATUS PreloadWindows(VOID) {
-  EFI_HANDLE *h=NULL;UINTN n=0,found=0;
+  EFI_HANDLE *h=NULL;UINTN n=0,found=0,skipped=0;
   EFI_STATUS s=Gu.bs->LocateHandleBuffer(ByProtocol,&FsGuid,NULL,&n,&h);
   if(EFI_ERROR(s))return s;
   if(!h||n>256){GuFree(h);return EFI_COMPROMISED_DATA;}
@@ -38,19 +38,32 @@ static EFI_STATUS PreloadWindows(VOID) {
     EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *fs=NULL;EFI_FILE_PROTOCOL *root=NULL,*file=NULL;
     EFI_STATUS x=Gu.bs->HandleProtocol(h[i],&FsGuid,(VOID**)&fs);
     if(!EFI_ERROR(x)&&fs)x=fs->OpenVolume(fs,&root);
-    if(EFI_ERROR(x)||!root){s=EFI_DEVICE_ERROR;break;}
+    /* A volume the firmware cannot open (an empty card reader, an unreadable file system) cannot hold a boot manager that
+       LoadImage could start, and the Windows that runs on this PC boots from a volume the firmware can read. Such a volume is
+       skipped and logged instead of ending the search; every volume that is readable is still checked as before. */
+    if(EFI_ERROR(x)||!root) {
+      GuLog("Windows volume %zu of %zu: handle=%#llx open_volume=%#llx; skipped\n",(size_t)(i+1),(size_t)n,(unsigned long long)(UINTN)h[i],(unsigned long long)x);
+      skipped++;continue;
+    }
     x=root->Open(root,&file,(CHAR16*)WindowsPath,EFI_FILE_MODE_READ,0);
     if(!EFI_ERROR(x)&&file) {
       UINT8 mz[2];UINTN bytes=2;EFI_STATUS y=file->Read(file,&bytes,mz);
       EFI_STATUS closed=file->Close(file);
       if(EFI_ERROR(y)||EFI_ERROR(closed)||bytes!=2||mz[0]!='M'||mz[1]!='Z')s=EFI_COMPROMISED_DATA;
-      else {found++;WindowsVolume=h[i];}
-    } else if(x!=EFI_NOT_FOUND)s=EFI_DEVICE_ERROR;
+      else {
+        found++;WindowsVolume=h[i];
+        GuLog("Windows volume %zu of %zu: handle=%#llx has the boot manager\n",(size_t)(i+1),(size_t)n,(unsigned long long)(UINTN)h[i]);
+      }
+    } else if(x!=EFI_NOT_FOUND) {
+      GuLog("Windows volume %zu of %zu: handle=%#llx open_boot_manager=%#llx; skipped\n",(size_t)(i+1),(size_t)n,(unsigned long long)(UINTN)h[i],(unsigned long long)x);
+      skipped++;
+    }
     x=root->Close(root);if(EFI_ERROR(x))s=x;
     if(EFI_ERROR(s))break;
   }
-  GuFree(h);GuLog("Windows candidates=%zu status=%#llx\n",(size_t)found,(unsigned long long)s);
+  GuFree(h);GuLog("Windows candidates=%zu status=%#llx skipped_volumes=%zu\n",(size_t)found,(unsigned long long)s,(size_t)skipped);
   if(EFI_ERROR(s))return s;
+  if(found>1)GuLogText("More than one volume has \\EFI\\Microsoft\\Boot\\bootmgfw.efi, so the program cannot tell which Windows to start. Unplug or remove the extra boot partition for the unlock.\n");
   if(found!=1)return found?EFI_NO_MAPPING:EFI_NOT_FOUND;
   s=MakeWindowsPath();if(EFI_ERROR(s))return s;
   s=Gu.bs->LoadImage(FALSE,Gu.image,WindowsDevicePath,NULL,0,&WindowsImage);
