@@ -75,11 +75,11 @@
       "sha256": "7e118923c7a23edc36114d63273a46e3e04e9af98695a42203e7ac2dfe9fc1dc"
     },
     {
-      "name": "nvidia-utils 610.43.03 package (CachyOS archive)",
-      "file": "nvidia-utils-610.43.03-1-x86_64_v3.pkg.tar.zst",
-      "url": "https://archive.cachyos.org/archive/cachyos-v3/nvidia-utils-610.43.03-1-x86_64_v3.pkg.tar.zst",
-      "size": 314789539,
-      "sha256": "e17e7c92eeffa178b0fe1f40eb17a47095f8fc3ce4a77bf115cf5bd5a4df86e9"
+      "name": "nvidia-utils 610.43.03 package (Arch Linux archive)",
+      "file": "nvidia-utils-610.43.03-1-x86_64.pkg.tar.zst",
+      "url": "https://archive.archlinux.org/packages/n/nvidia-utils/nvidia-utils-610.43.03-1-x86_64.pkg.tar.zst",
+      "size": 314807723,
+      "sha256": "c3367ff68632ac7daf6ca50ef7cbdd1cb5d09f7fe0b26125b312c73e52a34cf4"
     },
     {
       "name": "Python 3.14 embeddable (only used to unpack the firmware locally)",

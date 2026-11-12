@@ -23,7 +23,7 @@ The installer downloads these files on the user's PC, checks each against the SH
 | File | Source | Terms |
 |---|---|---|
 | `NVIDIA-kernel-module-source-610.43.03.tar.xz` | download.nvidia.com | NVIDIA open GPU kernel modules (MIT / GPL-2.0 dual license) |
-| `nvidia-utils-610.43.03-1-x86_64_v3.pkg.tar.zst` | archive.cachyos.org (repackaged NVIDIA Linux driver) | NVIDIA driver license; contains the GSP firmware |
+| `nvidia-utils-610.43.03-1-x86_64.pkg.tar.zst` | archive.archlinux.org (repackaged NVIDIA Linux driver) | NVIDIA driver license; contains the GSP firmware |
 | `python-3.14.0-embed-amd64.zip` | python.org | PSF License; only used to run the extraction scripts |
 
 The generated firmware files (`booter_load_ad102.bin`, `v67-ad102-610.43.03-four-plm.bin`, `gsp_ga10x.bin`, `gsp_boot_ad102.bin`, `gsp_boot_desc_ad102.bin`) and any ROM, PROM or capture dumps of a user's card must not be committed. `.gitignore` excludes them.
