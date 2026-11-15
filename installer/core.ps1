@@ -270,10 +270,19 @@ function Invoke-Check {
     }
     elseif ($det.Count -gt 1) { Add (L 'Graphics card' '显卡') 'fail' (L 'more than one supported card: not supported' '检测到多块支持的显卡, 不支持') }
     else { Add (L 'Graphics card' '显卡') 'fail' (L 'no supported GeForce RTX 40 card found (see the README for the list of models)' '没有找到支持的 GeForce RTX 40 显卡 (支持的型号见 README)') }
-    $mem = $null; try { $mem = [int](& nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>$null | Select-Object -First 1) } catch { }
+    # nvidia-smi lists every NVIDIA GPU in the PC (an older card may come first), so take the row of the supported card found above.
+    # pci.device_id prints the device id followed by the vendor id, e.g. 0x270410DE.
+    $mem = $null
+    if ($gpu) {
+        try {
+            foreach ($row in @(& nvidia-smi --query-gpu=pci.device_id,memory.total --format=csv,noheader,nounits 2>$null)) {
+                if (([string]$row -match '^\s*0x([0-9A-Fa-f]{4})10DE\s*,\s*([0-9]+)\s*$') -and ($Matches[1].ToLower() -eq [string]$gpu.id)) { $mem = [int]$Matches[2]; break }
+            }
+        } catch { }
+    }
     if ($gpu) {
         if ($mem) { if ($mem -ge $gpu.vram_mib_min -and $mem -le $gpu.vram_mib_max) { Add (L 'Memory size' '显存容量') 'ok' "$mem MiB" } else { Add (L 'Memory size' '显存容量') 'fail' (L "$mem MiB does not match this model (expected $($gpu.vram_mib_min)-$($gpu.vram_mib_max) MiB); modded or non-standard cards are not supported" "$mem MiB 与该型号不符 (应为 $($gpu.vram_mib_min)-$($gpu.vram_mib_max) MiB); 不支持改版或非标准显存的显卡") } }
-        else { Add (L 'Memory size' '显存容量') 'warn' (L 'nvidia-smi not available; VRAM size will be checked again by the boot program' 'nvidia-smi 不可用, 显存容量会由开机程序再次检查') }
+        else { Add (L 'Memory size' '显存容量') 'warn' (L 'nvidia-smi is not available or did not list this card; VRAM size will be checked again by the boot program' 'nvidia-smi 不可用, 或没有列出这张显卡, 显存容量会由开机程序再次检查') }
     }
     if ($others.Count -gt 0) { $od = (($others | ForEach-Object { $_.Name }) -join ', ') + (L ' - connect the monitor to the supported card only' ' - 请只把显示器接到受支持的显卡上'); Add (L 'Other display adapters' '其他显示适配器') 'warn' $od } else { Add (L 'Other display adapters' '其他显示适配器') 'ok' (L 'none' '无') }
     $blState = 'unknown'; try { $blState = (Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction Stop).ProtectionStatus.ToString() } catch { }
