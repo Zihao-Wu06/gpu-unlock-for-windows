@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Generic build: everything that differs from card to card is read at run time from
  * \GPU-UNLOCK\PROFILE.TXT, which the program writes itself on its first (read-only) "enrollment" boot.
- * Which cards are accepted is decided by the chip table in app.c (RTX 4090 verified; AD103/AD104 experimental). */
+ * Which cards are accepted is decided by the chip table in app.c (RTX 4090 verified; AD103/AD104/AD106 experimental). */
 #pragma once
 #include <Uefi.h>
 #ifndef GU_GENERIC

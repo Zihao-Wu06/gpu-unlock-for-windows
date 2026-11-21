@@ -16,9 +16,9 @@ What the installer changes on your PC
     and ~85 MB of firmware files. USB mode: copies the files to a FAT32 drive you choose (nothing is formatted).
   - Downloads ~330 MB of NVIDIA firmware inputs (hash-checked) and unpacks them on your PC. Nothing from NVIDIA is shipped here.
 
-Requirements: Windows 10/11 x64, UEFI boot, Secure Boot OFF, BitLocker/Device Encryption OFF, exactly one supported card,
-monitor on that card. Supported: RTX 4090, 4080, 4080 SUPER, 4070 Ti SUPER (AD103 or AD102), 4070 Ti, 4070 SUPER, 4070. This project tested only the RTX 4090 (the RTX 4080 16 GB is
-confirmed by one user report); on every card except the 4090 the first start only reads the card, an unlock needs one armed trial, and automatic only after it worked.
+Requirements: Windows 10/11 x64, UEFI boot, Secure Boot OFF, CSM OFF (not checked by the installer), BitLocker/Device Encryption OFF, exactly one supported card,
+monitor on that card. Supported: RTX 4090, 4080, 4080 SUPER, 4070 Ti SUPER (AD103 or AD102), 4070 Ti, 4070 SUPER, 4070, 4060 Ti (8 or 16 GB, AD106). This project tested only the RTX 4090 (the RTX 4080 16 GB is
+confirmed by one user report, and the RTX 4060 Ti 8 GB unlocked on one PC); on every card except the 4090 the first start only reads the card, an unlock needs one armed trial, and automatic only after it worked.
 Not supported: 48 GB modded cards, 4090 D, laptops, other series, multi-GPU, Secure Boot on.
 Only the RTX 4090 was tested by this project. See README.md / README.zh-CN.md in the repository for what is and is not tested.
 
