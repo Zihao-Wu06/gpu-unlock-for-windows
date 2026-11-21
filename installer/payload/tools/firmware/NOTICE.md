@@ -6,6 +6,14 @@ are decoded unchanged from the pinned 610.43.03 source archive. The extraction
 also preserves that package's complete `usr/share/licenses/nvidia-utils/LICENSE`
 as `NVIDIA-LICENSE`. It is installed with the firmware package.
 
+When the Arch Linux archive cannot be reached, the same two files are read from
+the package's pinned `alternative`, NVIDIA's own `NVIDIA-Linux-x86_64-610.43.03.run`
+from download.nvidia.com (`firmware/gsp_ga10x.bin` and `LICENSE`). The `.run`
+is checked against its pinned SHA-256 and read as a makeself archive (the
+zstd-compressed tar after its header); none of its shell code is executed. Both
+extracted files carry the same SHA-256 values as their nvidia-utils copies, and
+they are checked against those values whichever source was used.
+
 The locally built firmware package includes the stock AD102 Booter and GSP boot
 assets from that same source revision, plus the generated four-PLM Ada payload.
 Ada uses the shared `gsp_ga10x.bin` and its separate `.fwsignature_ad10x`

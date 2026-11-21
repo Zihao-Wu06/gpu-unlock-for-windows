@@ -49,6 +49,27 @@
       "notice": {
         "path": "usr/share/licenses/nvidia-utils/LICENSE",
         "sha256": "c692fb14ad4f499c6aee1b9e144e6905148c420e6225b17cb2937366c1e507ad"
+      },
+      "alternative": {
+        "name": "NVIDIA Linux x86_64 driver installer, used when the Arch Linux archive cannot be reached",
+        "version": "610.43.03",
+        "format": "makeself archive with a zstd-compressed tar payload; read, never executed",
+        "sha256": "45e2d4c134a23c35e50f253a4aa63e7e5e8d17e3d185d4a07c8a58e9612ed392",
+        "size": 461538429,
+        "firmware": [
+          {
+            "path": "firmware/gsp_ga10x.bin",
+            "size": 84277400,
+            "sha256": "572373620a37418f24dc16b5031c39338778c3257e48e8408de9a57291b24f3a"
+          }
+        ],
+        "filename": "NVIDIA-Linux-x86_64-610.43.03.run",
+        "url": "https://download.nvidia.com/XFree86/Linux-x86_64/610.43.03/NVIDIA-Linux-x86_64-610.43.03.run",
+        "checksum_url": "https://download.nvidia.com/XFree86/Linux-x86_64/610.43.03/NVIDIA-Linux-x86_64-610.43.03.run.sha256sum",
+        "notice": {
+          "path": "LICENSE",
+          "sha256": "c692fb14ad4f499c6aee1b9e144e6905148c420e6225b17cb2937366c1e507ad"
+        }
       }
     }
   ],

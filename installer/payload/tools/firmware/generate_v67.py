@@ -5,8 +5,10 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import hashlib
+import re
 import subprocess
 import tarfile
 import sys
@@ -126,6 +128,99 @@ def read_member(archive: tarfile.TarFile, name: str) -> bytes:
     return result
 
 
+def read_members(archive: tarfile.TarFile, names: list[str]) -> dict[str, bytes]:
+    """Like read_member, for several members in one pass over a streamed archive."""
+    found: dict[str, bytes] = {}
+    for member in archive:
+        if member.name not in names:
+            continue
+        if member.name in found:
+            raise ValueError(f"duplicate package member: {member.name}")
+        if not member.isfile() or member.size > 128 * 1024 * 1024:
+            raise ValueError(f"not a regular file in package: {member.name}")
+        stream = archive.extractfile(member)
+        if stream is None:
+            raise ValueError(f"could not read package member: {member.name}")
+        found[member.name] = stream.read()
+    missing = [name for name in names if name not in found]
+    if missing:
+        raise ValueError(f"missing package member: {', '.join(missing)}")
+    return found
+
+
+def run_payload_offset(run: Path) -> int:
+    """Byte offset of the payload in a makeself .run: its own `skip=N` line says the
+    payload starts at line N. The .run's shell code is read as text, never executed."""
+    with run.open("rb") as stream:
+        head = stream.read(64 * 1024)
+    if re.match(rb"#! ?/bin/sh\n", head) is None:  # NVIDIA writes "#! /bin/sh"
+        raise ValueError("not a makeself .run file")
+    match = re.search(rb"^skip=(\d+)$", head, re.MULTILINE)
+    if match is None or not 1 <= int(match.group(1)) <= 100000:
+        raise ValueError("no usable skip= line in the .run header")
+    lines, offset = int(match.group(1)) - 1, 0
+    with run.open("rb") as stream:
+        while lines:
+            block = stream.read(1024 * 1024)
+            if not block:
+                raise ValueError("truncated .run header")
+            count = block.count(b"\n")
+            if count < lines:
+                lines -= count
+                offset += len(block)
+                continue
+            position = -1
+            for _ in range(lines):
+                position = block.index(b"\n", position + 1)
+            return offset + position + 1
+    return offset
+
+
+@contextlib.contextmanager
+def open_zstd_at(path: Path, offset: int):
+    """A readable, decompressed view of the zstd data that starts at `offset` in `path`."""
+    with path.open("rb") as raw:
+        raw.seek(offset)
+        if raw.read(4) != b"\x28\xb5\x2f\xfd":
+            raise ValueError("the .run payload is not zstd data")
+        raw.seek(offset)
+        try:
+            from compression import zstd  # Python 3.14 and later, as embedded by the installer
+        except ImportError:
+            zstd = None
+        if zstd is not None:
+            with zstd.ZstdFile(raw) as stream:
+                yield stream
+            return
+        try:
+            import zstandard
+        except ImportError:
+            zstandard = None
+        if zstandard is not None:
+            with zstandard.ZstdDecompressor().stream_reader(raw, read_across_frames=True) as stream:
+                yield stream
+            return
+        process = subprocess.Popen(["zstd", "-dc"], stdin=raw, stdout=subprocess.PIPE)
+        try:
+            yield process.stdout
+            while process.stdout.read(1024 * 1024):  # drain the rest so zstd can exit
+                pass
+            if process.wait() != 0:
+                raise ValueError("zstd could not read the .run payload")
+        finally:
+            if process.stdout:
+                process.stdout.close()
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+
+
+def extract_run_members(run: Path, names: list[str]) -> dict[str, bytes]:
+    with open_zstd_at(run, run_payload_offset(run)) as stream:
+        with tarfile.open(fileobj=stream, mode="r|") as archive:
+            return read_members(archive, names)
+
+
 def build_payload() -> bytes:
     """Build the original GA102 rejoin15 payload (public API retained)."""
     return _build_payload(PATCHED_WORDS)
@@ -146,7 +241,8 @@ def _build_payload(patched_words: dict[int, int]) -> bytes:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("package", type=Path, help="pinned nvidia-utils-610.43.03 package")
+    parser.add_argument("package", type=Path,
+                        help="pinned nvidia-utils-610.43.03 package, or its pinned alternative NVIDIA-Linux-x86_64-610.43.03.run")
     parser.add_argument("output", type=Path, help="directory for extracted firmware and payload")
     args = parser.parse_args()
 
@@ -154,14 +250,31 @@ def main() -> int:
     with args.package.open("rb") as package_file:
         for block in iter(lambda: package_file.read(1024 * 1024), b""):
             package_bytes_hash.update(block)
-    if package_bytes_hash.hexdigest() != PACKAGE_SHA256:
-        raise SystemExit("package SHA-256 does not match the pinned nvidia-utils artifact")
+    manifest = json.loads(MANIFEST.read_text())
+    nvidia_utils = manifest["source_artifacts"][2]
+    alternative = nvidia_utils.get("alternative")
 
-    pkginfo = extract_member(args.package, ".PKGINFO").decode("utf-8", errors="replace")
-    if f"pkgver = {PACKAGE_VERSION}" not in pkginfo.splitlines():
-        raise SystemExit("package metadata version does not match 610.43.03-1")
+    if package_bytes_hash.hexdigest() == PACKAGE_SHA256:
+        pkginfo = extract_member(args.package, ".PKGINFO").decode("utf-8", errors="replace")
+        if f"pkgver = {PACKAGE_VERSION}" not in pkginfo.splitlines():
+            raise SystemExit("package metadata version does not match 610.43.03-1")
+        gsp = extract_member(args.package, FIRMWARE_PREFIX + "gsp_ga10x.bin")
+        notice = nvidia_utils["notice"]
+        license_text = extract_member(args.package, notice["path"])
+    elif alternative is not None and package_bytes_hash.hexdigest() == alternative["sha256"]:
+        # NVIDIA's own installer holds the same firmware and license files (checked below).
+        with args.package.open("rb") as run_file:
+            header = run_file.read(64 * 1024)
+        label = f'label="NVIDIA Accelerated Graphics Driver for Linux-x86_64 {alternative["version"]}"'
+        if label.encode() not in header.splitlines():
+            raise SystemExit("the .run header does not name driver " + alternative["version"])
+        notice = alternative["notice"]
+        gsp_path = alternative["firmware"][0]["path"]
+        members = extract_run_members(args.package, [gsp_path, notice["path"]])
+        gsp, license_text = members[gsp_path], members[notice["path"]]
+    else:
+        raise SystemExit("package SHA-256 matches neither the pinned nvidia-utils artifact nor its pinned alternative")
 
-    gsp = extract_member(args.package, FIRMWARE_PREFIX + "gsp_ga10x.bin")
     if sha256(gsp) != GSP_SHA256:
         raise SystemExit("GA10x GSP firmware SHA-256 does not match the pinned artifact")
 
@@ -171,9 +284,6 @@ def main() -> int:
     ad102_payload = build_ad102_payload()
     if sha256(ad102_payload) != AD102_PAYLOAD_SHA256:
         raise SystemExit("generated AD102 V67 image differs from its pinned SHA-256")
-    manifest = json.loads(MANIFEST.read_text())
-    notice = manifest["source_artifacts"][2]["notice"]
-    license_text = extract_member(args.package, notice["path"])
     if sha256(license_text) != notice["sha256"]:
         raise SystemExit("NVIDIA license notice differs from pinned package")
     args.output.mkdir(parents=True, exist_ok=True)
