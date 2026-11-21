@@ -15,6 +15,8 @@ What the installer changes on your PC
   - Partition mode: shrinks one volume by 304 MiB and creates a 300 MiB FAT32 partition (no drive letter) for the program
     and ~85 MB of firmware files. USB mode: copies the files to a FAT32 drive you choose (nothing is formatted).
   - Downloads ~330 MB of NVIDIA firmware inputs (hash-checked) and unpacks them on your PC. Nothing from NVIDIA is shipped here.
+    If archive.archlinux.org cannot be reached, it downloads NVIDIA's own NVIDIA-Linux-x86_64-610.43.03.run (~440 MB) instead
+    and reads the same firmware out of it (the .run is never executed).
 
 Requirements: Windows 10/11 x64, UEFI boot, Secure Boot OFF, BitLocker/Device Encryption OFF, exactly one supported card,
 monitor on that card. Supported: RTX 4090, 4080, 4080 SUPER, 4070 Ti SUPER (AD103 or AD102), 4070 Ti, 4070 SUPER, 4070. This project tested only the RTX 4090 (the RTX 4080 16 GB is

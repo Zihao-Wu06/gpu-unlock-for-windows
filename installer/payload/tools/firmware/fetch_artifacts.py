@@ -28,6 +28,26 @@ def inputs(manifest: dict) -> list[dict]:
     return [source, package]
 
 
+def fetch_any(entry: dict, output: Path, offline: bool = False) -> Path:
+    """Fetch an entry, or its pinned "alternative" (the same needed files from another host).
+
+    A source already in the cache wins; otherwise the primary is tried first and the
+    alternative only when the primary cannot be fetched or does not verify."""
+    alternative = entry.get("alternative")
+    if alternative is None:
+        return fetch(entry, output, offline)
+    for candidate in (entry, alternative):
+        if (output / candidate["filename"]).exists():
+            return fetch(candidate, output, offline)
+    try:
+        return fetch(entry, output, offline)
+    except (OSError, ValueError) as first:
+        try:
+            return fetch(alternative, output, offline)
+        except (OSError, ValueError) as second:
+            raise type(second)(f"{first}; alternative: {second}") from second
+
+
 def fetch(entry: dict, output: Path, offline: bool = False) -> Path:
     output.mkdir(parents=True, exist_ok=True)
     destination = output / entry["filename"]
@@ -72,7 +92,7 @@ def main() -> None:
     args = parser.parse_args()
     try:
         for entry in inputs(json.loads(MANIFEST.read_text())):
-            print(fetch(entry, args.output, args.offline))
+            print(fetch_any(entry, args.output, args.offline))
     except (OSError, ValueError) as error:
         parser.exit(1, f"fetch failed: {error}\n")
 

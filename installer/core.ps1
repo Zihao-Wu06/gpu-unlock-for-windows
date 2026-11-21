@@ -297,7 +297,7 @@ function Invoke-Check {
         $u = @(Get-Volume | Where-Object { $_.DriveLetter -and $_.FileSystem -eq 'FAT32' -and $_.DriveLetter -ne $env:SystemDrive.TrimEnd(':') -and $_.SizeRemaining -gt 150MB })
         if ($u.Count -gt 0) { $ud = (($u | ForEach-Object { L "$($_.DriveLetter): $([math]::Round($_.SizeRemaining/1MB)) MB free" "$($_.DriveLetter): 剩余 $([math]::Round($_.SizeRemaining/1MB)) MB" }) -join '; '); Add (L 'FAT32 drive for USB mode' 'U 盘模式用的 FAT32 盘') 'ok' $ud } else { Add (L 'FAT32 drive for USB mode' 'U 盘模式用的 FAT32 盘') 'fail' (L 'no FAT32 volume with 150 MB free' '没有剩余 150 MB 以上的 FAT32 卷') }
     }
-    $cached = $true; foreach ($i in $Manifest.inputs) { if (-not (Test-Path -LiteralPath (Join-Path $Cache $i.file))) { $cached = $false } }
+    $cached = $true; foreach ($i in $Manifest.inputs) { if (-not (Find-CachedInput $i)) { $cached = $false } }
     if ($cached) { Add (L 'Downloads' '下载') 'ok' (L "all inputs already in $Cache" "所需文件都已在 $Cache 中") }
     else {
         $net = $true
@@ -317,45 +317,80 @@ function Invoke-Check {
 }
 
 # ------------------------------------------------------------------------------------------ downloads and firmware
+# An input may name a pinned "alternative": the same needed files from another host (the nvidia-utils package has
+# NVIDIA's own .run installer). Either file is accepted; the firmware generated from it is checked against the same hashes.
+function Get-InputSources($Entry) { $s = @($Entry); if ($Entry.alternative) { $s += $Entry.alternative }; return $s }
+function Find-CachedInput($Entry) {
+    # the first source of this input (the primary file, then its alternative) that is present in the cache
+    foreach ($s in (Get-InputSources $Entry)) { $p = Join-Path $Cache $s.file; if (Test-Path -LiteralPath $p) { return [pscustomobject]@{ Source = $s; Path = $p } } }
+    return $null
+}
+function Save-InputFile($Source) {
+    # downloads one pinned file into the cache; returns $null when it is there and verified, otherwise why it failed
+    $dest = Join-Path $Cache $Source.file
+    Log ((L 'downloading {0} ({1:N0} MB) from {2}' '正在下载 {0} ({1:N0} MB), 来源 {2}') -f $Source.file, ($Source.size / 1MB), $Source.url)
+    if ($DryRun) { return $null }
+    $part = $dest + '.part'
+    if (Test-Path -LiteralPath $part) { Remove-Item -LiteralPath $part -Force }
+    $wc = New-Object System.Net.WebClient
+    try {
+        $task = $wc.DownloadFileTaskAsync([Uri]$Source.url, $part)
+        $lastPct = -1
+        while (-not $task.IsCompleted) {
+            Start-Sleep -Seconds 2
+            if (Test-Path -LiteralPath $part) { $pct = [int](100 * (Get-Item -LiteralPath $part).Length / $Source.size); if ($pct -ge $lastPct + 10) { Log ("  {0}%" -f $pct); $lastPct = $pct } }
+        }
+        $null = $task.GetAwaiter().GetResult()   # PowerShell 5.1 writes a $null here, which would become part of the return value
+    } catch {
+        $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }
+        if (Test-Path -LiteralPath $part) { Remove-Item -LiteralPath $part -Force -ErrorAction SilentlyContinue }
+        return $e.Message
+    } finally { $wc.Dispose() }
+    $got = (Get-Item -LiteralPath $part).Length
+    if ($got -ne $Source.size) { Remove-Item -LiteralPath $part -Force; return (L "size $got, expected $($Source.size)" "大小为 $got, 应为 $($Source.size)") }
+    $h = Sha256 $part
+    if ($h -ne $Source.sha256) { Remove-Item -LiteralPath $part -Force; return (L "SHA-256 mismatch ($h)" "SHA-256 不匹配 ($h)") }
+    Move-Item -LiteralPath $part -Destination $dest -Force
+    Log (L "verified $($Source.file) sha256=$h" "已校验 $($Source.file) sha256=$h")
+    return $null
+}
 function Invoke-Download {
     if (-not (Test-Path -LiteralPath $Cache)) { New-Item -ItemType Directory -Path $Cache -Force | Out-Null }
     foreach ($i in $Manifest.inputs) {
-        $dest = Join-Path $Cache $i.file
-        if (Test-Path -LiteralPath $dest) {
-            if ((Get-Item -LiteralPath $dest).Length -eq $i.size -and (Sha256 $dest) -eq $i.sha256) { Log (L "cached and verified: $($i.file)" "已有缓存且校验通过: $($i.file)"); continue }
-            Log (L "cached copy of $($i.file) does not match; downloading again" "$($i.file) 的缓存副本不匹配, 重新下载") 'WARN'; Remove-Item -LiteralPath $dest -Force
+        $sources = @(Get-InputSources $i)
+        $have = $false
+        foreach ($s in $sources) {
+            $dest = Join-Path $Cache $s.file
+            if (-not (Test-Path -LiteralPath $dest)) { continue }
+            if ((Get-Item -LiteralPath $dest).Length -eq $s.size -and (Sha256 $dest) -eq $s.sha256) { Log (L "cached and verified: $($s.file)" "已有缓存且校验通过: $($s.file)"); $have = $true; break }
+            Log (L "cached copy of $($s.file) does not match; removing it" "$($s.file) 的缓存副本不匹配, 已删除") 'WARN'; Remove-Item -LiteralPath $dest -Force
         }
-        Log ((L 'downloading {0} ({1:N0} MB) from {2}' '正在下载 {0} ({1:N0} MB), 来源 {2}') -f $i.file, ($i.size / 1MB), $i.url)
-        if ($DryRun) { continue }
-        $part = $dest + '.part'
-        if (Test-Path -LiteralPath $part) { Remove-Item -LiteralPath $part -Force }
-        $wc = New-Object System.Net.WebClient
-        try {
-            $task = $wc.DownloadFileTaskAsync([Uri]$i.url, $part)
-            $lastPct = -1
-            while (-not $task.IsCompleted) {
-                Start-Sleep -Seconds 2
-                if (Test-Path -LiteralPath $part) { $pct = [int](100 * (Get-Item -LiteralPath $part).Length / $i.size); if ($pct -ge $lastPct + 10) { Log ("  {0}%" -f $pct); $lastPct = $pct } }
-            }
-            $task.GetAwaiter().GetResult()
-        } catch {
-            $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }; $why = $e.Message
-            if (Test-Path -LiteralPath $part) { Remove-Item -LiteralPath $part -Force -ErrorAction SilentlyContinue }
-            Fail (L "could not download $($i.file) from $($i.url): $($why). If this PC cannot connect, or the file is no longer at that address, download it on another PC and copy it into $($Cache)." "无法下载 $($i.file) ($($i.url)): $($why)。如果这台电脑连不上, 或该文件已不在这个地址, 请在另一台电脑上下载该文件, 复制到 $($Cache)。")
-        } finally { $wc.Dispose() }
-        $got = (Get-Item -LiteralPath $part).Length
-        if ($got -ne $i.size) { Remove-Item -LiteralPath $part -Force; Fail (L "$($i.file): size $got, expected $($i.size)" "$($i.file): 大小为 $got, 应为 $($i.size)") }
-        $h = Sha256 $part
-        if ($h -ne $i.sha256) { Remove-Item -LiteralPath $part -Force; Fail (L "$($i.file): SHA-256 mismatch ($h)" "$($i.file): SHA-256 不匹配 ($h)") }
-        Move-Item -LiteralPath $part -Destination $dest -Force
-        Log (L "verified $($i.file) sha256=$h" "已校验 $($i.file) sha256=$h")
+        if ($have) { continue }
+        $why = @()
+        foreach ($s in $sources) {
+            if ($why.Count -gt 0) { Log (L "trying the alternative source of the same files: $($s.name)" "改用同一批文件的备用来源: $($s.name)") 'WARN' }
+            $r = Save-InputFile $s
+            if ($null -eq $r) { $have = $true; break }
+            Log (L "could not download $($s.file) from $($s.url): $r" "无法下载 $($s.file) ($($s.url)): $r") 'WARN'
+            $why += "$($s.file): $r"
+        }
+        if ($DryRun -and $i.alternative) { $mb = [math]::Round($i.alternative.size / 1MB); Log (L "if that download fails, $($i.alternative.file) ($mb MB) from $($i.alternative.url) is used instead" "如果这次下载失败, 会改用 $($i.alternative.url) 的 $($i.alternative.file) ($mb MB)") }
+        if ($have) { continue }
+        if ($sources.Count -eq 1) {
+            Fail (L "could not download $($i.file) from $($i.url): $($r). If this PC cannot connect, or the file is no longer at that address, download it on another PC and copy it into $($Cache)." "无法下载 $($i.file) ($($i.url)): $($r)。如果这台电脑连不上, 或该文件已不在这个地址, 请在另一台电脑上下载该文件, 复制到 $($Cache)。")
+        }
+        $list = ($sources | ForEach-Object { "$($_.file) ($($_.url))" }) -join (L ' or ' ' 或 ')
+        Fail (L "could not download $($i.file) or its alternative ($($why -join '; ')). Download one of these files on another PC and copy it into $($Cache): $list" "无法下载 $($i.file) 及其备用文件 ($($why -join '; '))。请在另一台电脑上下载下面任意一个文件, 复制到 $($Cache): $list")
     }
 }
 function Invoke-Assets([string]$Staging) {
     # Unpack NVIDIA's firmware locally with the bundled scripts. Nothing from NVIDIA is shipped with this tool.
     if ($DryRun) { Log (L "dry run: would unpack the firmware into $Staging" "试运行: 将把固件解包到 $Staging"); return }
-    foreach ($i in $Manifest.inputs) { if (-not (Test-Path -LiteralPath (Join-Path $Cache $i.file))) { Fail (L "missing input $($i.file); run 'download' (or copy it into $Cache)" "缺少文件 $($i.file); 请先运行 'download' (或把它复制到 $Cache)") } }
-    foreach ($i in $Manifest.inputs) { $p = Join-Path $Cache $i.file; if ((Sha256 $p) -ne $i.sha256) { Fail (L "$($i.file) does not match its pinned SHA-256" "$($i.file) 与固定的 SHA-256 不一致") } }
+    foreach ($i in $Manifest.inputs) {
+        $c = Find-CachedInput $i
+        if (-not $c) { $names = (@(Get-InputSources $i) | ForEach-Object { $_.file }) -join (L ' or ' ' 或 '); Fail (L "missing input $names; run 'download' (or copy it into $Cache)" "缺少文件 $names; 请先运行 'download' (或把它复制到 $Cache)") }
+        if ((Sha256 $c.Path) -ne $c.Source.sha256) { Fail (L "$($c.Source.file) does not match its pinned SHA-256" "$($c.Source.file) 与固定的 SHA-256 不一致") }
+    }
     $py = Join-Path $DataDir 'py'
     if (-not (Test-Path -LiteralPath (Join-Path $py 'python.exe'))) {
         Log (L 'unpacking the embeddable Python used for the firmware step' '正在解包固件步骤所用的内嵌 Python')
@@ -364,7 +399,7 @@ function Invoke-Assets([string]$Staging) {
         Expand-Archive -LiteralPath (Join-Path $Cache 'python-3.14.0-embed-amd64.zip') -DestinationPath $py -Force
     }
     $assets = Join-Path $Staging 'GPU-UNLOCK\ASSETS'
-    Log (L "generating firmware files in $assets (this reads the 300 MB package and takes about a minute)" "正在 $assets 中生成固件文件 (需要读取 300 MB 的安装包, 约一分钟)")
+    Log (L "generating firmware files in $assets (this reads the 300-450 MB NVIDIA package and takes a minute or two)" "正在 $assets 中生成固件文件 (需要读取 300-450 MB 的 NVIDIA 安装包, 约一两分钟)")
     if ($DryRun) { return }
     if (Test-Path -LiteralPath $Staging) { Remove-Item -Recurse -Force -LiteralPath $Staging }
     New-Item -ItemType Directory -Path $assets -Force | Out-Null

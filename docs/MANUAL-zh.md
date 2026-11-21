@@ -159,7 +159,7 @@ powershell -ExecutionPolicy Bypass -File core.ps1 install -Mode usb -Drive E:
 **8.4 不能联网 / 下载很慢**
 在能上网的电脑上下载这三个文件，放进 `C:\ProgramData\GPU-Unlock\cache\`，安装器会逐个核对 SHA-256。（某个地址连不上或文件已被删除时，用别的电脑或浏览器下载同名同大小的文件即可。）
 - `NVIDIA-kernel-module-source-610.43.03.tar.xz`（26,172,192 字节），来自 download.nvidia.com；
-- `nvidia-utils-610.43.03-1-x86_64.pkg.tar.zst`（314,807,723 字节），来自 archive.archlinux.org（`/packages/n/nvidia-utils/`）；
+- `nvidia-utils-610.43.03-1-x86_64.pkg.tar.zst`（314,807,723 字节），来自 archive.archlinux.org（`/packages/n/nvidia-utils/`）；**或者**用它的备用文件 `NVIDIA-Linux-x86_64-610.43.03.run`（461,538,429 字节），来自 download.nvidia.com（`/XFree86/Linux-x86_64/610.43.03/`），两个放一个就行。安装器从 Arch 存档下载失败时会自动改下这个 `.run`；它只会被读取，不会被执行；
 - `python-3.14.0-embed-amd64.zip`（11,994,671 字节），来自 python.org（只用来本地提取固件）。
 
 **8.5 BIOS 更新 / 换硬件后不解锁**
@@ -199,7 +199,7 @@ bcdedit /set {fwbootmgr} displayorder {该标识符} /remove
 - 在窗口里实际点"试解锁一次"等实验性流程的按钮（界面只做了渲染检查，流程是用命令行测的）；
 - **任何非 4090 的显卡**（芯片表、显存范围、芯片编号检查都是按上游文档写的，从没在那些卡上运行过；只有 RTX 4080 16 GB 有一份用户报告确认可用）；
 - 安装窗口里的 U 盘选项；
-- 联网下载（测试机当时没有外网：下载走的是预先放好的缓存，下载代码只在本机的 TLS 1.3 测试服务器上跑过，没有连过真实网站；nvidia-utils 包的地址在 CachyOS 删除旧版本后改成了 Arch Linux 存档（#17），安装器的下载代码没有连过这个新地址；失败时按 8.4 手动放缓存）；
+- 联网下载（测试机当时没有外网：下载走的是预先放好的缓存，下载代码只在本机的 TLS 1.3 测试服务器上跑过，没有连过真实网站；nvidia-utils 包的地址在 CachyOS 删除旧版本后改成了 Arch Linux 存档（#17），安装器的下载代码没有连过这个新地址；失败时按 8.4 手动放缓存）。2026-11-22 Arch 存档停摆时，在一台电脑上验证过：下载 Arch 存档失败后会自动改用备用来源（用安装器副本、把备用文件换成小文件模拟），用 NVIDIA `.run` 生成的 5 个固件文件哈希全部一致；完整的 440 MB `.run` 自动下载流程没有端到端跑过，从 nvidia-utils 包提取的原路径这次也没有重新测（存档停摆）；
 - U 盘模式；安装中途失败的自动回滚；
 - 睡眠恢复后的行为；Windows 大版本更新、BIOS 更新之后的行为；
 - 真实应用（训练、ComfyUI、LLM）的收益；长时间满载稳定性；
