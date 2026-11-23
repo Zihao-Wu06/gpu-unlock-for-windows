@@ -23,7 +23,8 @@ def main():
     parser.add_argument("--offline", action="store_true")
     args = parser.parse_args()
     entries = fetch_artifacts.inputs(json.loads(fetch_artifacts.MANIFEST.read_text()))
-    source, package = [fetch_artifacts.fetch(entry, args.cache, args.offline) for entry in entries]
+    # The package may be the nvidia-utils archive or its pinned alternative, NVIDIA's .run installer.
+    source, package = [fetch_artifacts.fetch_any(entry, args.cache, args.offline) for entry in entries]
     args.output.mkdir(parents=True, exist_ok=True)
     subprocess.run([sys.executable, str(ROOT / "firmware/generate_v67.py"),
                     str(package), str(args.output)], check=True)

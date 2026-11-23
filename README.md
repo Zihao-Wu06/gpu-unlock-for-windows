@@ -27,7 +27,7 @@ Matrix-math throughput on the one card tested (**RTX 4090** 24 GB, 450 W limit, 
 ## How it works
 
 1. **Install.** The installer creates a hidden 300 MiB FAT32 partition with no drive letter, or uses a FAT32 USB drive you choose. It copies a small UEFI program there and adds a firmware boot entry, `GPU Unlock (auto)`, ahead of Windows.
-2. **Firmware.** The NVIDIA firmware inputs (about 330 MB) are **downloaded and unpacked on your own PC**, with every file checked against a pinned SHA-256. This repository contains no NVIDIA firmware.
+2. **Firmware.** The NVIDIA firmware inputs (about 330 MB) are **downloaded and unpacked on your own PC**, with every file checked against a pinned SHA-256. This repository contains no NVIDIA firmware. If the Arch Linux archive cannot be reached, the installer takes the same firmware and license files from NVIDIA's own Linux driver installer (`NVIDIA-Linux-x86_64-610.43.03.run`, about 440 MB, from download.nvidia.com) instead. It only reads that file and never runs it.
 3. **Every start.** The UEFI program checks that this is the expected card in a cold state. It then lets the card's signed firmware apply the setting, resets the card, hands the display back and starts Windows. The screen goes black briefly. If a check fails *before* the card's display driver is released, nothing is written and Windows starts normally. If one fails *after* that point, the program stops and asks you to power off (see [Risks](#risks)).
 4. **First start.** The program reads the card's identity read-only and saves it as `PROFILE.TXT`. On the tested card it then unlocks in the same start; other cards follow the careful path described under [Supported cards](#supported-cards).
 5. **Volatile.** The setting is lost at power-off and restart, so it is applied again at every start. The switch decides whether the *next* start unlocks, because the unlock has to happen before the NVIDIA driver loads.
@@ -77,8 +77,10 @@ The installer's **Check system** button checks each of these and refuses to inst
 | ASUS ROG STRIX Z790-H (BIOS 3107), i7-14700KF, ASUS RTX 4090 | Other boards and other 4090 brands; some firmware ignores or resets boot-order changes made from Windows |
 | Install, uninstall (the volume is restored to its exact size), switch on/off, re-enroll | USB-drive mode, rollback after a failed install |
 | First-start enrollment plus unlock, unlock after cold boot and restart, more than 10 successful unlocks | Behaviour after sleep (S3; the unlock is expected to be lost), with Fast Startup on, after Windows or BIOS updates |
-| Download, size and SHA-256 checks against a pre-filled cache and a local TLS 1.3 test server | A real online download on a fresh PC (the nvidia-utils address moved to the Arch Linux archive after CachyOS removed the old file, [#17](../../issues/17); this project has not run the installer's downloader against the new address; if a download fails, copy the file into the cache by hand) |
+| Download, size and SHA-256 checks against a pre-filled cache and a local TLS 1.3 test server | A real online download on a fresh PC, including the full 440 MB `.run` download by the installer (the nvidia-utils address moved to the Arch Linux archive after CachyOS removed the old file, [#17](../../issues/17); this project has not run the installer's downloader against the new address; if a download fails, copy the file into the cache by hand) |
 | UI at 100 %, and simulated 125 % and 150 % scaling | User names or paths with non-ASCII characters |
+
+The NVIDIA `.run` download fallback was tested by the author of [#27](../../pull/27) on Windows 10 Pro 22H2, not on the test PC above, while the Arch Linux archive was down (2026-11-22): after the archive timed out the installer switched to the alternative source (tested with a small stand-in file), and all five firmware files generated from the `.run` matched their pinned hashes.
 
 **Reports from other machines are very welcome.** Please open an issue with your board, BIOS version, GPU brand, Windows version and the boot log (button **Boot log**; the `FINAL` line matters most).
 
