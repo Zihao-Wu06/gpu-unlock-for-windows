@@ -100,6 +100,44 @@ static EFI_STATUS DisplayChild(const OWNER_RECORD *Record,GU_RELEASE_OWNER *Owne
   GuSha256(path,bytes,child->path_sha256);
   return EFI_SUCCESS;
 }
+/* A display output of the target driver that carries no live display state
+ * (a port the firmware enumerated but never lit: no GOP, no mode, or no
+ * framebuffer behind it) has nothing to preserve and is no obstacle to
+ * release. Permit it only when it proves the same identity and PCI ancestry
+ * DisplayChild demands of a live GOP child; a child with a live framebuffer
+ * that failed DisplayChild's stricter checks is still refused. Tolerated
+ * children are not recorded, so owner comparisons stay exact. */
+static EFI_STATUS DisplayChildNoGop(const OWNER_RECORD *Record,GU_RELEASE_OWNER *Owner) {
+  const EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *e=&Record->entry;
+  if(e->Attributes!=EFI_OPEN_PROTOCOL_BY_CHILD_CONTROLLER || e->AgentHandle!=Owner->agent ||
+     e->OpenCount!=1 || !e->ControllerHandle || e->ControllerHandle==Gu.handle ||
+     e->ControllerHandle==Gu.image ||
+     (memcmp(&Record->protocol,&PciGuid,sizeof(PciGuid)) &&
+      memcmp(&Record->protocol,&PathGuid,sizeof(PathGuid))))return EFI_ACCESS_DENIED;
+  EFI_GRAPHICS_OUTPUT_PROTOCOL *gop=NULL;
+  EFI_STATUS status=Gu.bs->HandleProtocol(e->ControllerHandle,&GopGuid,(VOID **)&gop);
+  if(!EFI_ERROR(status) && gop && gop->Mode && gop->Mode->FrameBufferBase && gop->Mode->FrameBufferSize)
+    return EFI_UNSUPPORTED;
+  EFI_DEVICE_PATH_PROTOCOL *path=NULL;
+  status=Gu.bs->HandleProtocol(e->ControllerHandle,&PathGuid,(VOID **)&path);
+  if(EFI_ERROR(status) || !path || !Gu.bs->LocateDevicePath)return EFI_UNSUPPORTED;
+  UINTN bytes=0;BOOLEAN end=FALSE;
+  for(UINTN i=0;i<128 && bytes<=4092;i++) {
+    EFI_DEVICE_PATH_PROTOCOL *node=(VOID *)((UINT8 *)path+bytes);
+    UINTN length=node->Length[0]+((UINTN)node->Length[1]<<8);
+    if(length<4 || length>4096-bytes)return EFI_COMPROMISED_DATA;
+    bytes+=length;
+    if(node->Type==END_DEVICE_PATH_TYPE) {
+      if(node->SubType!=END_ENTIRE_DEVICE_PATH_SUBTYPE || length!=4)return EFI_UNSUPPORTED;
+      end=TRUE;break;
+    }
+  }
+  if(!end)return EFI_COMPROMISED_DATA;
+  EFI_DEVICE_PATH_PROTOCOL *remaining=path;EFI_HANDLE parent=NULL;
+  status=Gu.bs->LocateDevicePath(&PciGuid,&remaining,&parent);
+  if(EFI_ERROR(status) || parent!=Gu.handle)return EFI_ACCESS_DENIED;
+  return EFI_SUCCESS;
+}
 EFI_STATUS GuFindReleaseOwner(EFI_SYSTEM_TABLE *Table,GU_RELEASE_OWNER *Owner,BOOLEAN Log) {
   OWNER_RECORD records[MAX_RECORDS];UINTN count=0,drivers=0;memset(Owner,0,sizeof(*Owner));
   if(!Gu.bs->DisconnectController || Gu.owned)return EFI_UNSUPPORTED;
@@ -123,6 +161,12 @@ EFI_STATUS GuFindReleaseOwner(EFI_SYSTEM_TABLE *Table,GU_RELEASE_OWNER *Owner,BO
       if(Log)GuLog("display child: record=%u handle=%#llx agent=%#llx status=%#llx\n",
         (unsigned)i,(unsigned long long)(UINTN)e->ControllerHandle,
         (unsigned long long)(UINTN)e->AgentHandle,(unsigned long long)status);
+      if(status==EFI_UNSUPPORTED) {
+        EFI_STATUS empty=DisplayChildNoGop(&records[i],Owner);
+        if(Log)GuLog("display child no-gop check: record=%u handle=%#llx status=%#llx\n",
+          (unsigned)i,(unsigned long long)(UINTN)e->ControllerHandle,(unsigned long long)empty);
+        if(!EFI_ERROR(empty))status=EFI_SUCCESS;
+      }
       if(EFI_ERROR(status))return status;
       continue;
     }
