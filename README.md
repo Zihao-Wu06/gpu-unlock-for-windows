@@ -4,13 +4,13 @@
 
 A one-click Windows installer that turns on the full-rate **FP32-accumulate tensor-core path** of GeForce RTX 40-series cards at every start, before Windows loads the NVIDIA driver. It comes with a small GUI and an on/off switch.
 
-> **Experimental. Only the RTX 4090 has been tested by this project; the RTX 4080 (16 GB) is verified by a user report, and the RTX 4060 Ti (8 GB) has unlocked on one PC.** The other RTX 40-series cards are supported but untested (see [Supported cards](#supported-cards)). At every start it changes the firmware boot order and writes GPU registers. Read [Risks](#risks) first. Use at your own risk.
+> **Experimental. Only the RTX 4090 has been tested by this project; the RTX 4080 (16 GB) is verified by a user report.** The other RTX 40-series cards are supported but untested (see [Supported cards](#supported-cards)). At every start it changes the firmware boot order and writes GPU registers. Read [Risks](#risks) first. Use at your own risk.
 
 ![Main window](docs/images/main-en.png)
 
 ## What you get
 
-Matrix-math throughput, PyTorch, single runs. **RTX 4090** 24 GB, 450 W limit (the card this project tested):
+Matrix-math throughput on the one card tested (**RTX 4090** 24 GB, 450 W limit, PyTorch, single runs). Other cards have not been measured:
 
 | Test | Locked (TFLOPS) | Unlocked | Change |
 |---|---|---|---|
@@ -19,18 +19,6 @@ Matrix-math throughput, PyTorch, single runs. **RTX 4090** 24 GB, 450 W limit (t
 | FP16, FP32 accumulate, 8192³ | 152.9 | ≈168 | +10 % |
 | BF16, FP32 accumulate, 8192³ | 156.5 | ≈178 | +14 % |
 | FP16 with FP16 accumulate, FP32 CUDA cores | — | — | no change |
-
-**RTX 4060 Ti** 8 GB, 160 W limit (one PC, `tools/bench_gemm.py`, see [Supported cards](#supported-cards)):
-
-| Test | Locked (TFLOPS) | Unlocked | Change |
-|---|---|---|---|
-| TF32 4096³ | 22.5 | 36.4 | **+62 %** (1.9× per clock) |
-| FP16, FP32 accumulate, 4096³ | 44.5 | 69.3 | **+56 %** (1.9× per clock) |
-| FP16, FP32 accumulate, 8192³ | 45.2 | 67.3 | +49 % |
-| BF16, FP32 accumulate, 8192³ | 45.8 | 69.9 | +53 % |
-| FP16 with FP16 accumulate, FP32 CUDA cores | — | — | no change |
-
-Other cards have not been measured here (the RTX 4080 report is under [Supported cards](#supported-cards)).
 
 - Numeric results are bit-identical before and after.
 - The card stays at its power limit, so clocks drop and you do not get the theoretical 2×.
@@ -46,13 +34,13 @@ Other cards have not been measured here (the RTX 4080 report is under [Supported
 
 ## Supported cards
 
-Made for **GeForce RTX 40-series** cards: RTX 4090, 4080, 4080 SUPER, 4070 Ti SUPER, 4070 Ti, 4070 SUPER, 4070 and 4060 Ti (standard memory sizes, one card per PC). **The RTX 4090 was tested by this project, the RTX 4080 (16 GB) is verified by a user report ([#8](../../issues/8)), and the RTX 4060 Ti (8 GB) has unlocked on one PC; the other cards are untested.**
+Made for **GeForce RTX 40-series** cards: RTX 4090, 4080, 4080 SUPER, 4070 Ti SUPER, 4070 Ti, 4070 SUPER, 4070 and 4060 Ti 8 GB (standard memory sizes, one card per PC). **The RTX 4090 was tested by this project; the RTX 4080 (16 GB) and the RTX 4060 Ti (8 GB) are verified by user reports ([#8](../../issues/8), [#25](../../issues/25)); the other cards are untested.**
 
 The RTX 4070 Ti SUPER exists with two different chips: the common AD103 version (PCI ID `10DE:2705`) and a later AD102 version (`10DE:2689`, a cut-down RTX 4090 chip). Both are accepted. The AD102 version was added from the public PCI ID list and press reports after a user report; this project has never run on one.
 
-The RTX 4060 Ti (AD106 chip) is accepted in both memory sizes: `10DE:2803` (8 GB) and `10DE:2805` (16 GB). It was added from the public PCI ID list. The **8 GB card has unlocked on one PC** (2026-11-22: MSI B450M PRO-M2 MAX with BIOS A.10, Ryzen 5 3600, ASUS RTX 4060 Ti 8 GB, Windows 10 Pro 22H2, driver 596.21). The first start read the card (chip id `0x196000a1`, 8188 MiB, and the same cold-state values as the bigger chips), one trial unlocked it and handed the display back, and FP16 matrix math with FP32 accumulate went from 44.5 to 69.3 TFLOPS (1.9× per clock; the 160 W power limit lowers the clock), with bit-identical results. Two things were needed on that board. CSM had to be turned off (see [Requirements](#requirements)). And the firmware did not start the program by itself at first: with the program's partition on a second (SATA) disk, it put Windows Boot Manager back in first place and its BIOS boot list did not show the new entry, so that first trial was started from the firmware boot menu (F11). After the program was reinstalled onto the Windows disk (NVMe) and *Boot Option #1* was set to `GPU Unlock (auto)` in the BIOS, the firmware started it at every restart: it enrolled the card, ran a second successful trial, and auto-unlock was turned on. A start with automatic (not trial) unlock was not checked on that PC. The 4060 Ti still follows the careful path below. The 16 GB card (`10DE:2805`) is untested. The rare AD104 version of the 4060 Ti (`10DE:2788`) and the RTX 4060 are not accepted.
-
 The RTX 4080 (16 GB, `10DE:2704`) is **verified by a user report** ([#8](../../issues/8)), not by this project's own tests: on one PC (Ryzen 7 7800X3D, Windows 11, driver 617.42) the trial unlocked, automatic unlock then worked at every start over several cold boots, and the user measured FP16 matrix math with FP32 accumulate going from 92.7 to 178.1 TFLOPS. It still follows the careful path below, because one report from one PC is not a test of every board. On a second 4080 (ASUS ROG STRIX Z790-E, [#9](../../issues/9)) the previous build unlocked the card but stopped at the display handoff, and the screen stayed black until the PC was powered off; setting a display mode on the reconnected output, as the reporter did, fixed it three times out of three. The current build contains the same idea, written here and not yet tested on that board.
+
+The RTX 4060 Ti 8 GB (AD106, `10DE:2803`) is **verified by a user report** ([#25](../../issues/25)), not by this project's own tests. It was added from the public PCI ID list. On one PC (MSI B450M PRO-M2 MAX with BIOS A.10, Ryzen 5 3600, ASUS RTX 4060 Ti 8 GB, Windows 10 Pro 22H2, driver 596.21) the first start read the card (chip id `0x196000a1`, 8188 MiB, and the same cold-state values as the bigger chips), the trial unlocked it, automatic unlock then worked at a later start, and the user measured FP16 matrix math with FP32 accumulate going from 44.5 to 69.3 TFLOPS (1.9× per clock; the 160 W power limit lowers the clock), with bit-identical results. Two things were needed on that board. CSM had to be turned off (see [Requirements](#requirements)). And the firmware did not start the boot entry by itself until the program was reinstalled onto the Windows disk and *Boot Option #1* was set to `GPU Unlock (auto)` in the BIOS; both were changed together, so one of them helped. The 4060 Ti still follows the careful path below. The 16 GB card (`10DE:2805`) has not been tried and is not accepted yet.
 
 On every card other than the RTX 4090 the program is more careful (all of it can be undone from the window):
 
@@ -60,7 +48,7 @@ On every card other than the RTX 4090 the program is more careful (all of it can
 2. **One trial.** You click **Try unlock once**. The next start tries a single unlock. The permission is used up *before* the attempt, so if the screen stays black, nothing repeats.
 3. **Automatic only after it worked.** **Turn on auto-unlock** only appears after a trial was verified on your PC. Until then the switch only keeps the boot program on (it reads the card and waits); you can switch it off at any time, which also cancels a pending trial.
 
-Not supported: RTX 4090 D, 48 GB modded cards, laptop GPUs, RTX 4060, the AD104 RTX 4060 Ti, 30- and 50-series, more than one supported card in a PC. The installer refuses these cards, and it warns when another display adapter is present (the boot program itself refuses to run unless the screen is on the supported card).
+Not supported: RTX 4090 D, 48 GB modded cards, laptop GPUs, RTX 4060, the RTX 4060 Ti 16 GB and its AD104 version, 30- and 50-series, more than one supported card in a PC. The installer refuses these cards, and it warns when another display adapter is present (the boot program itself refuses to run unless the screen is on the supported card).
 
 If you try another card, please [open an issue](../../issues/new/choose) with the result, successful or not.
 
@@ -70,9 +58,9 @@ The installer's **Check system** button checks each of these and refuses to inst
 
 | | |
 |---|---|
-| GPU | Exactly one supported card (see above), with its standard memory size (24 GB for the 4090, 16 GB for the 4080 family and 4070 Ti SUPER, 12 GB for the 4070 Ti, 4070 SUPER and 4070, 8 GB or 16 GB for the 4060 Ti) |
+| GPU | Exactly one supported card (see above), with its standard memory size (24 GB for the 4090, 16 GB for the 4080 family and 4070 Ti SUPER, 12 GB for the 4070 Ti, 4070 SUPER and 4070, 8 GB for the 4060 Ti) |
 | OS | Windows 10 / 11, 64-bit |
-| Boot | UEFI (not Legacy/CSM), with CSM (legacy boot support) **off** in the BIOS. **Check system** cannot see CSM. With CSM on, an MSI B450 board handed the card over with bus mastering switched on, and the boot program refused to enroll it (`enroll: PCI state not suitable ... command=0x100007` in the boot log). On MSI boards CSM is turned off by setting *Windows 10 WHQL Support* to Enabled |
+| Boot | UEFI (not Legacy/CSM), with CSM (legacy boot support) **off** in the BIOS. **Check system** cannot see CSM. With CSM on, an MSI B450 board ([#25](../../issues/25)) handed the card over with bus mastering switched on, and the boot program refused to enroll it (`enroll: PCI state not suitable ... command=0x100007` in the boot log). On MSI boards CSM is turned off by setting *Windows 10 WHQL Support* to Enabled |
 | Secure Boot | **Off** (the boot program is unsigned) |
 | BitLocker / Device Encryption | **Off** (changing the boot path would trigger recovery) |
 | Display | Connected to the supported card only |
@@ -84,10 +72,9 @@ The installer's **Check system** button checks each of these and refuses to inst
 
 | Verified on the test PC | Not verified |
 |---|---|
-| Windows 11 Pro 24H2 (26100), driver 610.88 | Windows 10 (apart from the second PC below), Home and Server editions |
-| The trial flow (read only, wait, one trial, confirm), forced onto the 4090 with a `trial_required=1` profile key | **Every card other than the 4090.** The RTX 4080 16 GB is confirmed by a user report (see Supported cards), not by this project. The chip table and the VRAM and chip-id checks for AD103 and AD104 are written from upstream documentation, and the entries for the AD102 4070 Ti SUPER and the AD106 4060 Ti from the public PCI ID list; apart from that one 4080 report and the 4060 Ti 8 GB on the second PC below, none of them was ever run on such a card |
-| ASUS ROG STRIX Z790-H (BIOS 3107), i7-14700KF, ASUS RTX 4090 | Other boards and other 4090 brands; some firmware ignores or resets boot-order changes made from Windows (seen on the second PC below) |
-| A second PC (2026-11-22): MSI B450M PRO-M2 MAX (BIOS A.10), Ryzen 5 3600, ASUS RTX 4060 Ti 8 GB, Windows 10 Pro 22H2 (19045), driver 596.21. Enrollment (after CSM was turned off), a trial unlock started from the F11 boot menu, benchmark before and after. After reinstalling onto the Windows disk and setting *Boot Option #1* to `GPU Unlock (auto)` in the BIOS: enrollment and a second trial started by the firmware itself, then auto-unlock turned on | On that PC: a start with automatic (not trial) unlock. With the program on a second (SATA) disk, the firmware put Windows Boot Manager back in first place and its BIOS boot list did not show `GPU Unlock (auto)`; whether the move to the Windows disk or the BIOS setting fixed it is not known |
+| Windows 11 Pro 24H2 (26100), driver 610.88 | Windows 10, Home and Server editions |
+| The trial flow (read only, wait, one trial, confirm), forced onto the 4090 with a `trial_required=1` profile key | **Every card other than the 4090.** The RTX 4080 16 GB and the RTX 4060 Ti 8 GB are confirmed by user reports (see Supported cards), not by this project. The chip table and the VRAM and chip-id checks for AD103 and AD104 are written from upstream documentation, and the entries for the AD102 4070 Ti SUPER and the AD106 4060 Ti from the public PCI ID list; apart from those two reports, none of them was ever run on such a card |
+| ASUS ROG STRIX Z790-H (BIOS 3107), i7-14700KF, ASUS RTX 4090 | Other boards and other 4090 brands; some firmware ignores or resets boot-order changes made from Windows (seen in [#25](../../issues/25)) |
 | Install, uninstall (the volume is restored to its exact size), switch on/off, re-enroll | USB-drive mode, rollback after a failed install |
 | First-start enrollment plus unlock, unlock after cold boot and restart, more than 10 successful unlocks | Behaviour after sleep (S3; the unlock is expected to be lost), with Fast Startup on, after Windows or BIOS updates |
 | Download, size and SHA-256 checks against a pre-filled cache and a local TLS 1.3 test server | A real online download on a fresh PC (the nvidia-utils address moved to the Arch Linux archive after CachyOS removed the old file, [#17](../../issues/17); this project has not run the installer's downloader against the new address; if a download fails, copy the file into the cache by hand) |
@@ -103,7 +90,7 @@ The installer's **Check system** button checks each of these and refuses to inst
 4. Click **Install…**, choose the internal partition (recommended) or a USB drive, tick the risk box (and, for an experimental card, the extra box), and click **Install**.
 5. Restart when asked. On an experimental card, click **Try unlock once** and restart again; after a successful trial click **Turn on auto-unlock**.
 
-If **Boot log** still shows no log after a restart, the boot program did not run: some firmware puts Windows Boot Manager back in first place. Start `GPU Unlock (auto)` once from the firmware boot menu (F11 on MSI, F8 on ASUS, often F12 elsewhere), and set it as the first boot option in the BIOS. On one MSI board the BIOS boot list showed the entry only after the program was installed onto the same disk as Windows (choose the Windows volume in the **Install…** dialog, or `-TargetVolume C` on the command line).
+If **Boot log** still shows no log after a restart, the boot program did not run: some firmware puts Windows Boot Manager back in first place. Start `GPU Unlock (auto)` once from the firmware boot menu (F11 on MSI, F8 on ASUS, often F12 elsewhere), and set it as the first boot option in the BIOS. In one report ([#25](../../issues/25)) the firmware started the program at every start only after two changes made together, so one of them helped: installing it onto the same disk as Windows (choose the Windows volume in the **Install…** dialog, or `-TargetVolume C` on the command line), and setting *Boot Option #1* to `GPU Unlock (auto)` in the BIOS.
 
 The interface is entirely English or entirely Chinese. Switch with **中文 / English** at the top right.
 

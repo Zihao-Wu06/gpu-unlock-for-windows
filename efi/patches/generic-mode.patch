@@ -39,7 +39,7 @@ index bc8bdd0..cf73c21 100644
                  UEFI / "edk2/MdePkg/Include/X64"]
      subprocess.run([args.zig, "cc", *flags, *(f"-I{p}" for p in includes),
 diff --git a/windows/uefi/app.c b/windows/uefi/app.c
-index f742379..49a3084 100644
+index f742379..a6f7f98 100644
 --- a/windows/uefi/app.c
 +++ b/windows/uefi/app.c
 @@ -10,6 +10,8 @@
@@ -62,7 +62,7 @@ index f742379..49a3084 100644
    return Gu.fault?EFI_DEVICE_ERROR:EFI_SUCCESS;
  }
  static VOID LogHash(const char *Name,const VOID *Data,UINTN Bytes) {
-@@ -226,10 +230,227 @@ static EFI_STATUS PromCheck(VOID) {
+@@ -226,10 +230,226 @@ static EFI_STATUS PromCheck(VOID) {
    }
    GuFree(prom);return good?EFI_SUCCESS:Gu.fault?EFI_DEVICE_ERROR:EFI_CRC_ERROR;
  }
@@ -131,8 +131,7 @@ index f742379..49a3084 100644
 +  {0x2782,0x194,"GeForce RTX 4070 Ti",12160,12288,FALSE},
 +  {0x2783,0x194,"GeForce RTX 4070 SUPER",12160,12288,FALSE},
 +  {0x2786,0x194,"GeForce RTX 4070",12160,12288,FALSE},
-+  {0x2803,0x196,"GeForce RTX 4060 Ti",8064,8192,FALSE},
-+  {0x2805,0x196,"GeForce RTX 4060 Ti 16GB",16256,16384,FALSE}
++  {0x2803,0x196,"GeForce RTX 4060 Ti",8064,8192,FALSE}
 +};
 +static const GU_CHIP *ChipForId(UINT32 Id) {
 +  if((Id&0xffffU)!=0x10deU)return NULL;
@@ -291,7 +290,7 @@ index f742379..49a3084 100644
    if(PendingOwner.agent)GuLogText("U will release the RTX firmware driver, restore verified access settings if needed, then attempt WPR_CFG -> FBPA -> WPR -> FEAT in ONE SEC2 launch, then SS0/SS1 if required gates pass; log mismatches and recover.\n");
    GuLogText("Press U once. One SEC2 fire containing four ordered PLM writes, then selectors/FLR/Windows on full success. The last frame may remain visible. Power OFF on STOP. Esc/30s cancels.\n");
    if(!GuLogReady())return EFI_DEVICE_ERROR;
-@@ -245,6 +466,11 @@ static EFI_STATUS Arm(VOID) {
+@@ -245,6 +465,11 @@ static EFI_STATUS Arm(VOID) {
  }
  static VOID PausePreflightFailure(VOID) {
    if(GuScreenDetached || Gu.started || !Table->ConIn || !Table->ConIn->ReadKeyStroke)return;
@@ -303,7 +302,7 @@ index f742379..49a3084 100644
    if(Table->ConIn->Reset)Table->ConIn->Reset(Table->ConIn,FALSE);
    GuConsole("Preflight stopped before unlock. See the FINAL stage above and REPORT.TXT.\n");
    GuConsole("Press Enter or Esc to return to firmware; automatic return in 60 seconds. U cannot start an attempt here.\n");
-@@ -293,6 +519,39 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
+@@ -293,6 +518,39 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
      (unsigned)secure,(unsigned long long)status);
    status=Step(status);if(EFI_ERROR(status))goto finish;
    Stage="watchdog";status=Step(Gu.bs->SetWatchdogTimer(0,0,0,NULL));if(EFI_ERROR(status))goto finish;
@@ -343,7 +342,7 @@ index f742379..49a3084 100644
    Stage="target";status=Step(FindTarget());if(EFI_ERROR(status))goto finish;
    Stage="display";Gu.display_ok=DisplayCheck();status=Step(Gu.display_ok?EFI_SUCCESS:EFI_UNSUPPORTED);if(EFI_ERROR(status))goto finish;
    Stage="ownership";status=GuClaimController();
-@@ -311,6 +570,7 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
+@@ -311,6 +569,7 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE Image,EFI_SYSTEM_TABLE *St) {
    Stage="arming";status=Step(Arm());if(EFI_ERROR(status))goto finish;
    Stage="armed-config";status=Step(ConfigCheck(FALSE));if(EFI_ERROR(status))goto finish;
    Stage="armed-display";Gu.display_ok=DisplayCheck();status=Step(Gu.display_ok?EFI_SUCCESS:EFI_UNSUPPORTED);if(EFI_ERROR(status))goto finish;
