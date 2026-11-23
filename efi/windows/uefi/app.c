@@ -281,7 +281,7 @@ static EFI_STATUS ForEachPair(char *Text,PairFn Fn,VOID *Context) {
   }
   return EFI_SUCCESS;
 }
-/* Cards this program accepts. chipset is BOOT0 bits 28:20 (AD102 0x192, AD103 0x193, AD104 0x194); the full BOOT0 value is
+/* Cards this program accepts. chipset is BOOT0 bits 28:20 (AD102 0x192, AD103 0x193, AD104 0x194, AD106 0x196); the full BOOT0 value is
  * recorded at enrollment and must read back identically on every later boot. vram_* bound the VRAM register (MiB).
  * Only the RTX 4090 is validated on hardware by this project (verified). The others follow the upstream evidence and
  * stay in the trial flow: nothing is written to the card until the user arms one trial and it succeeds. */
@@ -294,7 +294,8 @@ static const GU_CHIP Chips[]={
   {0x2689,0x192,"GeForce RTX 4070 Ti SUPER (AD102)",16256,16384,FALSE},
   {0x2782,0x194,"GeForce RTX 4070 Ti",12160,12288,FALSE},
   {0x2783,0x194,"GeForce RTX 4070 SUPER",12160,12288,FALSE},
-  {0x2786,0x194,"GeForce RTX 4070",12160,12288,FALSE}
+  {0x2786,0x194,"GeForce RTX 4070",12160,12288,FALSE},
+  {0x2803,0x196,"GeForce RTX 4060 Ti",8064,8192,FALSE}
 };
 static const GU_CHIP *ChipForId(UINT32 Id) {
   if((Id&0xffffU)!=0x10deU)return NULL;
@@ -374,7 +375,7 @@ static EFI_STATUS Enroll(VOID) {
   }
   GuFree(handles);
   if(EFI_ERROR(status))return status;
-  if(matches!=1){GuLog("enroll: need exactly one supported card (RTX 4090, 4080, 4080 SUPER, 4070 Ti SUPER, 4070 Ti, 4070 SUPER, 4070), found %zu\n",(size_t)matches);return EFI_UNSUPPORTED;}
+  if(matches!=1){GuLog("enroll: need exactly one supported card (RTX 4090, 4080, 4080 SUPER, 4070 Ti SUPER, 4070 Ti, 4070 SUPER, 4070, 4060 Ti), found %zu\n",(size_t)matches);return EFI_UNSUPPORTED;}
   const GU_CHIP *chipinfo=ChipForId(found_id);
   GuLog("enroll: card=%s id=%#x tier=%s\n",chipinfo->name,found_id,chipinfo->verified?"verified":"experimental");
   UINT32 config[64];UINTN segment,bus,device,function;

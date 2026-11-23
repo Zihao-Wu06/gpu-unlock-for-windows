@@ -1,6 +1,6 @@
 ---
 name: Result on another card / 其他显卡的结果
-about: You tried an experimental card (4080, 4080 SUPER, 4070 Ti SUPER, 4070 Ti, 4070 SUPER, 4070). Successful or not, please report.
+about: You tried an experimental card (4080, 4080 SUPER, 4070 Ti SUPER, 4070 Ti, 4070 SUPER, 4070, 4060 Ti). Successful or not, please report.
 title: "[card report] <card name> - <worked / failed at stage ...>"
 labels: card-report
 ---
@@ -24,8 +24,8 @@ Thank you for trying an experimental card. Whatever happened, it helps. Please d
 
 **Speed check** (optional, `python tools/bench_gemm.py locked` and `... unlocked`, paste the numbers)
 
-**Boot log** (button **Boot log**, or `core.ps1 logs`): paste the lines that start with `profile:`, `chip:`, `cold state:`, `TRIAL RUN`, `POST-GOP` and `FINAL`.
+**Boot log** (button **Boot log**, or `core.ps1 logs`): paste the lines that start with `enroll:`, `profile:`, `chip:`, `cold state:`, `TRIAL RUN`, `POST-GOP` and `FINAL`.
 
 ---
 
-**使用说明（中文）**：请填上面的显卡、主板、BIOS、系统和驱动版本，勾选发生了什么，并把"开机日志"里以 `profile:`、`chip:`、`cold state:`、`TRIAL RUN`、`POST-GOP`、`FINAL` 开头的几行贴上来。不要上传显卡 ROM 或 NVIDIA 固件文件。
+**使用说明（中文）**：请填上面的显卡、主板、BIOS、系统和驱动版本，勾选发生了什么，并把"开机日志"里以 `enroll:`、`profile:`、`chip:`、`cold state:`、`TRIAL RUN`、`POST-GOP`、`FINAL` 开头的几行贴上来。不要上传显卡 ROM 或 NVIDIA 固件文件。

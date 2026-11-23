@@ -5,7 +5,7 @@ This directory is the complete corresponding source of `installer/payload/gpuunl
 - `windows/` is a subset of [brandonjank/gpu-unlock-ada](https://github.com/brandonjank/gpu-unlock-ada) at commit `26cea8ede6735155c7333dc637db46166d6ede82`. It holds `build.py`, `THIRD_PARTY_NOTICES.md` and `uefi/`, with this project's changes already applied.
 - `patches/generic-mode.patch` is the same changes as a diff against that commit (`git diff` of the upstream tree). It touches `windows/build.py`, `uefi/app.c`, `uefi/app_io.c`, `uefi/app_io.h` and `uefi/handoff.inc`, and adds `uefi/board_profile_generic.h`. The changes:
   - a `generic` build mode that enrolls the card at its first start (`PROFILE.TXT`) instead of compiling one board's identity into the binary;
-  - a **chip table** in `app.c` (`Chips[]`): PCI id, BOOT0 chipset id, memory range and tier for each accepted card. The RTX 4090 is `verified`; the other cards (4080, 4080 SUPER, 4070 Ti SUPER in its AD103 version `2705` and its AD102 version `2689`, 4070 Ti, 4070 SUPER, 4070) are not;
+  - a **chip table** in `app.c` (`Chips[]`): PCI id, BOOT0 chipset id, memory range and tier for each accepted card. The RTX 4090 is `verified`; the other cards (4080, 4080 SUPER, 4070 Ti SUPER in its AD103 version `2705` and its AD102 version `2689`, 4070 Ti, 4070 SUPER, 4070, and the AD106 RTX 4060 Ti 8 GB `2803`) are not;
   - a **trial flow** for every card that is not `verified` (or whose profile has `trial_required=1`): the first start only reads the card; an unlock needs `\GPU-UNLOCK\ARMED.TXT` (consumed *before* the attempt) or `\GPU-UNLOCK\AUTO.TXT` (written by the Windows installer after a verified trial);
   - profile version 2 (`pci_id`, `chip`, optional `trial_required`); version 1 files (4090 only) are still read;
   - an automatic mode (`GU_AUTO`) with no countdown, which continues to the next boot entry (Windows) when a check fails;
@@ -32,9 +32,9 @@ The output `EFI/BOOT/BOOTX64.EFI` is the file the installer ships as `gpuunlock.
 
 ## Reproducing the shipped binary byte for byte
 
-The shipped `gpuunlock.efi` has SHA-256 `e2780f1a0790c5684b6555480aad8a7794f7e04ffa3f54b885bceb5c539bc231` (96256 bytes), built with Zig 0.15.2 from this tree. Because the build strips the source path (`-ffile-prefix-map`), the hash does not depend on where the tree sits. It was rebuilt from a fresh copy of this directory at two different paths on 2026-11-04 and matched both times.
+The shipped `gpuunlock.efi` has SHA-256 `ad66ec5c2e858f38fd7eaa0a71cb6fc55b7b9cb9711803bd21d3669b36f3c749` (96256 bytes), built with Zig 0.15.2 from this tree. Because the build strips the source path (`-ffile-prefix-map`), the hash does not depend on where the tree sits. It was built in WSL (Ubuntu) on 2026-11-23; the same setup rebuilt the previous source tree to its published hash `e2780f1a…c231` byte for byte, at a path different from the one used on 2026-11-04.
 
-(The previous 0.3.0 builds, `4e726c2c…76f5`, `1bf857df…765a`, `2d39b939…b04a` and before it `722d137d…3ac4`, differ only by the Windows-volume search above, the display `SetMode` step, the AD102 4070 Ti SUPER table entry and the I/O Space handoff change above. The earlier 0.2.0 binary, `5fa4ded5…ee69`, embedded the build path and could only be reproduced at one fixed location.)
+(The previous build, `e2780f1a…c231`, differs only by the RTX 4060 Ti 8 GB table entry and the card list in the enrollment log line. The build tested in #25, `5421e0cd…cbb9d`, also had an RTX 4060 Ti 16 GB entry. The 0.3.0 builds before `e2780f1a…c231`, namely `4e726c2c…76f5`, `1bf857df…765a`, `2d39b939…b04a` and before them `722d137d…3ac4`, differ from it only by the Windows-volume search above, the display `SetMode` step, the AD102 4070 Ti SUPER table entry and the I/O Space handoff change above. The earlier 0.2.0 binary, `5fa4ded5…ee69`, embedded the build path and could only be reproduced at one fixed location.)
 
 If you use your own build, replace `installer/payload/gpuunlock.efi` and update `efi.size` and `efi.sha256` in `installer/payload/manifest.json`. The installer refuses an EFI file that does not match the manifest.
 
