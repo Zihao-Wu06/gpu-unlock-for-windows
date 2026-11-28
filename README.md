@@ -34,7 +34,7 @@ Matrix-math throughput on the one card tested (**RTX 4090** 24 GB, 450 W limit, 
 
 ## Supported cards
 
-Made for **GeForce RTX 40-series** cards: RTX 4090, 4080, 4080 SUPER, 4070 Ti SUPER, 4070 Ti, 4070 SUPER and 4070 (standard memory sizes, one card per PC). **The RTX 4090 was tested by this project, and the RTX 4080 (16 GB) is verified by a user report ([#8](../../issues/8)); the other cards are untested.**
+Made for **GeForce RTX 40-series** cards: RTX 4090, 4080, 4080 SUPER, 4070 Ti SUPER, 4070 Ti, 4070 SUPER, 4070 and RTX 4060 Ti (standard memory sizes, one card per PC). **The RTX 4090 was tested by this project, and the RTX 4080 (16 GB), the RTX 4080 SUPER and the RTX 4060 Ti are verified by user reports; the other cards are untested.**
 
 The RTX 4070 Ti SUPER exists with two different chips: the common AD103 version (PCI ID `10DE:2705`) and a later AD102 version (`10DE:2689`, a cut-down RTX 4090 chip). Both are accepted. The AD102 version was added from the public PCI ID list and press reports after a user report; this project has never run on one.
 
@@ -42,13 +42,15 @@ The RTX 4080 (16 GB, `10DE:2704`) is **verified by a user report** ([#8](../../i
 
 The RTX 4080 SUPER (16 GB, `10DE:2702`, stock memory) has **one user report** ([#28](../../issues/28)), also not this project's own test: on a Gainward card (MSI MAG B650 TOMAHAWK WIFI, Ryzen 7 7800X3D, Windows 11, driver 621.01) the trial unlocked with a single display, automatic unlock then worked at every start, and BF16 matrix math with FP32 accumulate went from 92.2 to 161.3 TFLOPS at the same clocks. With three displays on the card the trial stopped cleanly at `ownership` until the reporter built pull request [#4](../../pull/4), which is not part of this build. Like the 4080, it still follows the careful path below.
 
+The RTX 4060 Ti 8 GB (`10DE:2803`, AD106) has **one user report**, also not this project's own test: on an ASUS card (MAXSUN MS-Terminator B760M D4, Core i5-13400F, no integrated GPU, Windows 11 26200, driver 621.40, single display on the card) the read-only enrollment recorded chip `0x196000a1`, 8188 MiB and a clean cold state; the armed trial then completed the full four-write PLM chain and wrote the speed selectors in one SEC2 fire, `SS0 0x14540065 -> 0x88888888` and `SS1 0x6 -> 0x8`, followed by PCIe FLR `result=0` and a clean Windows handoff (`register_unlock_verified=1`, `FINAL status=0`, `clean=1`). As with the other cards, this is one report from one PC. The 16 GB variant (`10DE:2805`) is accepted with its own memory bound but has **no report at all**. AD106 uses the same `ad10x` family data as AD102-AD104 upstream (same SEC2 Booter, GSP boot image and four-write PLM table), so only the chip identity and the VRAM window differ. The `FBPA` entry of the chain reported `matched=0` on this card, which the transaction already treats as non-fatal.
+
 On every card other than the RTX 4090 the program is more careful (all of it can be undone from the window):
 
 1. **Read only.** After installing, the first start only reads the card and saves its profile. Nothing is written to the card.
 2. **One trial.** You click **Try unlock once**. The next start tries a single unlock. The permission is used up *before* the attempt, so if the screen stays black, nothing repeats.
 3. **Automatic only after it worked.** **Turn on auto-unlock** only appears after a trial was verified on your PC. Until then the switch only keeps the boot program on (it reads the card and waits); you can switch it off at any time, which also cancels a pending trial.
 
-Not supported: RTX 4090 D, 48 GB modded cards, laptop GPUs, RTX 4060 series, 30- and 50-series, more than one supported card in a PC. The installer refuses these cards, and it warns when another display adapter is present (the boot program itself refuses to run unless the screen is on the supported card).
+Not supported: RTX 4090 D, 48 GB modded cards, laptop GPUs, the vanilla RTX 4060 (8 GB), other RTX 4060-series cards, 30- and 50-series, more than one supported card in a PC. The installer refuses these cards, and it warns when another display adapter is present (the boot program itself refuses to run unless the screen is on the supported card).
 
 If you try another card, please [open an issue](../../issues/new/choose) with the result, successful or not.
 

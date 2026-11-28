@@ -4,7 +4,7 @@
   "efi": {
     "file": "gpuunlock.efi",
     "size": 96256,
-    "sha256": "e2780f1a0790c5684b6555480aad8a7794f7e04ffa3f54b885bceb5c539bc231"
+    "sha256": "09f76f3fcb025780af68f7730ea8dce91429cc44b57dc0454247a7cd26a835c8"
   },
   "supported": {
     "gpus": [
@@ -63,6 +63,20 @@
         "tier": "experimental",
         "vram_mib_min": 11900,
         "vram_mib_max": 12400
+      },
+      {
+        "id": "2803",
+        "name": "GeForce RTX 4060 Ti",
+        "tier": "experimental",
+        "vram_mib_min": 8180,
+        "vram_mib_max": 8200
+      },
+      {
+        "id": "2805",
+        "name": "GeForce RTX 4060 Ti 16GB",
+        "tier": "experimental",
+        "vram_mib_min": 16280,
+        "vram_mib_max": 16400
       }
     ]
   },

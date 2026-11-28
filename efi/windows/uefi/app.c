@@ -294,7 +294,12 @@ static const GU_CHIP Chips[]={
   {0x2689,0x192,"GeForce RTX 4070 Ti SUPER (AD102)",16256,16384,FALSE},
   {0x2782,0x194,"GeForce RTX 4070 Ti",12160,12288,FALSE},
   {0x2783,0x194,"GeForce RTX 4070 SUPER",12160,12288,FALSE},
-  {0x2786,0x194,"GeForce RTX 4070",12160,12288,FALSE}
+  {0x2786,0x194,"GeForce RTX 4070",12160,12288,FALSE},
+  /* AD106: RTX 4060 Ti 8 GB / 16 GB. Upstream Zagitta treats AD106 as the same
+   * ad10x family pointer as AD102-AD104 (same Booter, GSP boot image and
+   * four-write PLM table), so only the identity and the VRAM bound differ. */
+  {0x2803,0x196,"GeForce RTX 4060 Ti",8180,8200,FALSE},
+  {0x2805,0x196,"GeForce RTX 4060 Ti 16GB",16280,16400,FALSE}
 };
 static const GU_CHIP *ChipForId(UINT32 Id) {
   if((Id&0xffffU)!=0x10deU)return NULL;
